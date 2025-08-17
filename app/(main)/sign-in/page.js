@@ -22,6 +22,7 @@ import {
   Lock,
   Mail,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -100,18 +101,6 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome Back
-          </h1>
-          <p className="text-gray-600">
-            {wasRedirected
-              ? 'Please sign in to access that page'
-              : 'Sign in to your account to continue'}
-          </p>
-        </div>
-
         <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-semibold text-center text-gray-900">
@@ -240,14 +229,14 @@ export default function SignInPage() {
               <div className="text-center">
                 <p className="text-sm text-gray-600">
                   Don't have an account?{' '}
-                  <a
+                  <Link
                     href={`/sign-up${
                       wasRedirected ? `?redirect=${redirectUrl}` : ''
                     }`}
                     className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                   >
                     Sign up
-                  </a>
+                  </Link>
                 </p>
               </div>
             </CardFooter>
