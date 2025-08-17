@@ -1,4 +1,5 @@
-const config = {
+// tailwind.config.js
+export default {
   theme: {
     container: {
       center: true,
@@ -6,7 +7,5 @@ const config = {
     },
     extend: {}, // অন্য কিছুর জন্য extend ব্যবহার করবে
   },
-  plugins: ['@tailwindcss/postcss'],
+  plugins: [],
 };
-
-export default config;

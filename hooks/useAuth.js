@@ -232,8 +232,6 @@ export const AuthProvider = ({ children }) => {
   // Logout function
   // Logout function
   const logout = useCallback(async () => {
-    console.log('clicked----------------');
-
     try {
       // Get valid access token from context
       const token = accessToken;
