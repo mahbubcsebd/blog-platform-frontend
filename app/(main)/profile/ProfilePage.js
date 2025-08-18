@@ -73,6 +73,7 @@ const ProfilePage = () => {
     if (isAuthenticated) {
       fetchProfileData();
     }
+    // react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   // Handle input changes

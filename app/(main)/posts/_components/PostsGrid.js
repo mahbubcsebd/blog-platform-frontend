@@ -84,6 +84,7 @@ export default function PostsGrid({
       setHasMore(true);
       loadInitialPosts();
     }
+    //react-hooks/exhaustive-deps
   }, [filters]);
 
   if (posts.length === 0 && !loading) {

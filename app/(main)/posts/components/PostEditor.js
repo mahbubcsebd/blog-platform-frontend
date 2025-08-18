@@ -3,6 +3,7 @@
 import { createPostAction, updatePostAction } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -10,7 +11,6 @@ import TextareaAutosize from 'react-textarea-autosize';
 import PublishModal from './PublishModal';
 
 // CodeMirror এবং এর থিম ও ভাষা ইম্পোর্ট করুন
-// import MarkdownDisplay from '@/app/posts/_components/content-display/MarkdownDisplay';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import CodeMirror from '@uiw/react-codemirror';
@@ -41,7 +41,15 @@ export default function PostEditor({
   isLoading = false,
 }) {
   const router = useRouter();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const isEditMode = mode === 'edit';
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // Transform the data structure to match component expectations
   const transformedInitialData = initialData
@@ -354,18 +362,23 @@ export default function PostEditor({
     }
   };
 
-  // Loading state
-  if (isLoading) {
+  // Show loading spinner for authentication
+  if (authLoading || (isLoading && isAuthenticated)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-        <div className="max-w-5xl mx-auto px-6 py-10">
-          <div className="space-y-8">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-96 w-full" />
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {authLoading ? 'Authenticating...' : 'Loading editor...'}
+          </p>
         </div>
       </div>
     );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (

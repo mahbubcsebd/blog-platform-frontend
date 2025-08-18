@@ -20,7 +20,7 @@ const UpdatePostSchema = PostSchema.extend({
   id: z.string().min(1, 'Post ID is required for update'),
 });
 
-export async function createPostAction(formData) {
+export async function createPostAction(formData, accessToken) {
   try {
     const data = {
       title: formData.get('title'),
@@ -58,7 +58,7 @@ export async function createPostAction(formData) {
     const previewImage = formData.get('previewImage');
     const formToSend = new FormData();
 
-    // Rebuild FormData for actual API call (because createPost expects FormData now)
+    // Rebuild FormData for actual API call
     for (const key in validatedData) {
       formToSend.append(key, validatedData[key]);
     }
@@ -71,7 +71,8 @@ export async function createPostAction(formData) {
       formToSend.append('previewImage', previewImage);
     }
 
-    const response = await createPost(formToSend);
+    // Pass accessToken to createPost
+    const response = await createPost(formToSend, accessToken);
 
     if (!response.success) {
       throw new Error(response.error || 'Failed to create post');
@@ -96,7 +97,7 @@ export async function createPostAction(formData) {
   }
 }
 
-export async function updatePostAction(formData) {
+export async function updatePostAction(formData, accessToken) {
   try {
     const data = {
       id: formData.get('id'),
@@ -149,7 +150,12 @@ export async function updatePostAction(formData) {
       formToSend.append('previewImage', previewImage);
     }
 
-    const response = await updatePost(validatedData.id, formToSend);
+    // Pass accessToken to updatePost
+    const response = await updatePost(
+      validatedData.id,
+      formToSend,
+      accessToken
+    );
 
     if (!response.success) {
       throw new Error(response.error || 'Failed to update post');

@@ -1,8 +1,9 @@
 'use client';
 
-import DebugAuth from '@/components/DebugAuth';
+// import DebugAuth from '@/components/DebugAuth';
 import { useAuth, useAuthenticatedFetch } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function DashboardPage() {
@@ -68,14 +69,16 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Debug info */}
-      <DebugAuth />
+      {/* <DebugAuth /> */}
 
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+              <Link href="/" className="text-xl font-semibold text-gray-900">
+                Dashboard
+              </Link>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
