@@ -1,32 +1,28 @@
 'use client';
 
-// import DebugAuth from '@/components/DebugAuth';
-import { useAuth, useAuthenticatedFetch } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function DashboardPage() {
-  const { user, loading, isAuthenticated, logout } = useAuth();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const { user, loading, isAuthenticated, logout, authenticatedFetch } =
+    useAuth(); // authenticatedFetch ekhane
   const [dashboardData, setDashboardData] = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Fetch dashboard data safely
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!isAuthenticated) return;
 
       try {
         setDataLoading(true);
-
         const response = await authenticatedFetch('/api/dashboard');
 
         if (response.ok) {
           const data = await response.json();
           setDashboardData(data);
         } else if (response.status === 401) {
-          // Unauthorized → logout user
           console.warn('Unauthorized, logging out...');
           logout();
         } else {
@@ -42,7 +38,6 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [isAuthenticated, authenticatedFetch, logout]);
 
-  // Show global loading while checking auth
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -54,7 +49,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Access denied fallback
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -68,9 +62,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Debug info */}
-      {/* <DebugAuth /> */}
-
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -129,10 +120,6 @@ export default function DashboardPage() {
               </div>
             ) : dashboardData ? (
               <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  Data loaded successfully!
-                </p>
-                {/* Render dashboard data dynamically */}
                 {Object.entries(dashboardData).map(([key, value]) => (
                   <p key={key} className="text-sm text-gray-600">
                     <span className="font-medium">{key}:</span> {value}

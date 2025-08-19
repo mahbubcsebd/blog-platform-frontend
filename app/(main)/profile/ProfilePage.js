@@ -1,12 +1,12 @@
 'use client';
 
-import { useAuth, useAuthenticatedFetch } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const ProfilePage = () => {
-  const { user, loading, isAuthenticated, logout } = useAuth();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const { user, loading, isAuthenticated, logout, authenticatedFetch } =
+    useAuth();
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -33,7 +33,7 @@ const ProfilePage = () => {
     }
   }, [loading, isAuthenticated, router]);
 
-  // Fetch profile data from API
+  // Fetch profile data
   const fetchProfileData = async () => {
     if (!isAuthenticated) return;
 
@@ -70,22 +70,14 @@ const ProfilePage = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchProfileData();
-    }
-    // react-hooks/exhaustive-deps
+    if (isAuthenticated) fetchProfileData();
   }, [isAuthenticated]);
 
-  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setProfileData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setProfileData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Show message temporarily
   const showMessage = (text, type) => {
     setMessage(text);
     setMessageType(type);
@@ -95,7 +87,6 @@ const ProfilePage = () => {
     }, 5000);
   };
 
-  // Save profile changes
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -103,20 +94,17 @@ const ProfilePage = () => {
     try {
       const response = await authenticatedFetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/profile`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(profileData),
-        }
+        { method: 'PUT', body: JSON.stringify(profileData) }
       );
       const data = await response.json();
 
       if (response.ok && data.success) {
         const updatedData = data.data
           ? { ...profileData, ...data.data }
-          : { ...profileData };
+          : profileData;
         setProfileData(updatedData);
         setInitialProfileData(updatedData);
-        setIsEditing(false); // switch back to view mode
+        setIsEditing(false);
         showMessage('Profile updated successfully!', 'success');
       } else {
         showMessage(data.message || 'Failed to update profile', 'error');
@@ -129,13 +117,11 @@ const ProfilePage = () => {
     }
   };
 
-  // Cancel editing
   const handleCancelEdit = () => {
     setProfileData({ ...initialProfileData });
     setIsEditing(false);
   };
 
-  // Show loading spinner
   if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -220,7 +206,7 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Message Display */}
+          {/* Message */}
           {message && (
             <div className="mx-6 mt-4">
               <div
@@ -235,8 +221,9 @@ const ProfilePage = () => {
             </div>
           )}
 
-          {/* Profile Form */}
+          {/* Form */}
           <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
+            {/* Basic Info */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Basic Information
@@ -322,6 +309,7 @@ const ProfilePage = () => {
               </div>
             </div>
 
+            {/* Additional Info */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Additional Information

@@ -3,11 +3,14 @@ const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 /**
  * Create Post
  */
-export async function createPost(formData) {
+export async function createPost(formData, accessToken) {
   try {
     const res = await fetch(`${baseUrl}/posts`, {
       method: 'POST',
-      body: formData, // Must be FormData
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${accessToken}`, // ✅ add token
+      },
     });
 
     if (!res.ok) {
@@ -88,11 +91,14 @@ export async function getPostBySlug(slug) {
 /**
  * Update Post by ID
  */
-export async function updatePost(id, formData) {
+export async function updatePost(id, formData, accessToken) {
   try {
     const res = await fetch(`${baseUrl}/posts/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      body: formData, // Must be FormData, no manual Content-Type
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${accessToken}`, // ✅ add token
+      },
     });
 
     if (!res.ok) {
