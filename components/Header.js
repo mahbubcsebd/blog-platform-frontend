@@ -12,15 +12,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import {
+  BarChart3,
   BookOpen,
   ChevronDown,
   Edit3,
+  FileText,
   Home,
   LogOut,
   PenTool,
   Plus,
   Settings,
+  Shield,
   User,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -37,14 +41,18 @@ const Header = () => {
     return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || 'U';
   };
 
+  // Check if user is admin or moderator
+  const isAdminOrModerator =
+    user?.role === 'ADMIN' || user?.role === 'MODERATOR';
+
   // Check if link is active
   const isActiveLink = (href) => {
     if (href === '/') return pathname === href;
     return pathname.startsWith(href);
   };
 
-  // Navigation items
-  const navItems = [
+  // Public navigation items (always visible)
+  const publicNavItems = [
     {
       href: '/',
       label: 'Home',
@@ -55,16 +63,27 @@ const Header = () => {
       label: 'All Blogs',
       icon: BookOpen,
     },
-    ...(isAuthenticated
-      ? [
-          {
-            href: '/posts/create',
-            label: 'Create Blog',
-            icon: Plus,
-          },
-        ]
-      : []),
   ];
+
+  // Dashboard navigation items (for authenticated users)
+  const dashboardNavItems = [
+    {
+      href: '/dashboard/create',
+      label: 'Write Story',
+      icon: Plus,
+    },
+  ];
+
+  // Get navigation items based on authentication status
+  const getNavItems = () => {
+    const items = [...publicNavItems];
+
+    if (isAuthenticated) {
+      items.push(...dashboardNavItems);
+    }
+
+    return items;
+  };
 
   // Handle logout
   const handleLogout = async () => {
@@ -94,7 +113,7 @@ const Header = () => {
 
           {/* Navigation - Desktop */}
           <nav className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
+            {getNavItems().map((item) => {
               const Icon = item.icon;
               const isActive = isActiveLink(item.href);
 
@@ -127,6 +146,14 @@ const Header = () => {
                   <span className="font-medium">{user.firstName}</span>
                 </span>
 
+                {/* Admin Badge */}
+                {isAdminOrModerator && (
+                  <div className="hidden sm:flex items-center px-2 py-1 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-700 text-xs font-medium rounded-full">
+                    <Shield className="h-3 w-3 mr-1" />
+                    {user.role}
+                  </div>
+                )}
+
                 {/* User Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -152,7 +179,7 @@ const Header = () => {
                     </Button>
                   </DropdownMenuTrigger>
 
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuContent className="w-64" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">
@@ -161,40 +188,117 @@ const Header = () => {
                         <p className="text-xs leading-none text-muted-foreground">
                           {user.email}
                         </p>
+                        {isAdminOrModerator && (
+                          <div className="flex items-center mt-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
+                            <Shield className="h-3 w-3 mr-1" />
+                            {user.role}
+                          </div>
+                        )}
                       </div>
                     </DropdownMenuLabel>
 
                     <DropdownMenuSeparator />
 
+                    {/* Dashboard Links */}
                     <DropdownMenuItem asChild>
                       <Link
                         href="/dashboard"
                         className="flex items-center cursor-pointer"
                       >
-                        <User className="mr-2 h-4 w-4" />
+                        <BarChart3 className="mr-2 h-4 w-4" />
                         <span>Dashboard</span>
                       </Link>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem asChild>
                       <Link
-                        href="/profile"
+                        href="/dashboard/drafts"
                         className="flex items-center cursor-pointer"
                       >
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Profile Settings</span>
+                        <Edit3 className="mr-2 h-4 w-4" />
+                        <span>My Drafts</span>
                       </Link>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem asChild>
                       <Link
-                        href="/posts/my-posts"
+                        href="/dashboard/profile"
                         className="flex items-center cursor-pointer"
                       >
-                        <Edit3 className="mr-2 h-4 w-4" />
-                        <span>My Posts</span>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
                       </Link>
                     </DropdownMenuItem>
+
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/dashboard/settings"
+                        className="flex items-center cursor-pointer"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+
+                    {/* Admin Section */}
+                    {isAdminOrModerator && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs font-semibold text-purple-600 uppercase tracking-wider">
+                          Admin Panel
+                        </DropdownMenuLabel>
+
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/admin"
+                            className="flex items-center cursor-pointer text-purple-700 hover:text-purple-800"
+                          >
+                            <Shield className="mr-2 h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/admin/posts"
+                            className="flex items-center cursor-pointer text-purple-700 hover:text-purple-800"
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            <span>Manage Posts</span>
+                          </Link>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/admin/users"
+                            className="flex items-center cursor-pointer text-purple-700 hover:text-purple-800"
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            <span>Manage Users</span>
+                          </Link>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/admin/categories"
+                            className="flex items-center cursor-pointer text-purple-700 hover:text-purple-800"
+                          >
+                            <BookOpen className="mr-2 h-4 w-4" />
+                            <span>Categories</span>
+                          </Link>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/admin/settings"
+                            className="flex items-center cursor-pointer text-purple-700 hover:text-purple-800"
+                          >
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Site Settings</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
 
                     <DropdownMenuSeparator />
 
@@ -219,6 +323,13 @@ const Header = () => {
                 >
                   <Link href="/sign-in">Sign In</Link>
                 </Button>
+                <Button
+                  size="sm"
+                  asChild
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
+                  <Link href="/sign-up">Sign Up</Link>
+                </Button>
               </div>
             )}
           </div>
@@ -228,7 +339,7 @@ const Header = () => {
         {isAuthenticated && (
           <div className="md:hidden border-t pt-4 pb-4">
             <nav className="flex flex-wrap gap-2">
-              {navItems.map((item) => {
+              {getNavItems().map((item) => {
                 const Icon = item.icon;
                 const isActive = isActiveLink(item.href);
 
@@ -247,6 +358,21 @@ const Header = () => {
                   </Link>
                 );
               })}
+
+              {/* Mobile Admin Link */}
+              {isAdminOrModerator && (
+                <Link
+                  href="/admin"
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActiveLink('/admin')
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'text-purple-700 hover:text-purple-800 hover:bg-purple-50'
+                  }`}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>Admin Panel</span>
+                </Link>
+              )}
             </nav>
           </div>
         )}

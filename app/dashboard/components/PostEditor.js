@@ -11,11 +11,12 @@ import TextareaAutosize from 'react-textarea-autosize';
 import PublishModal from './PublishModal';
 
 // CodeMirror এবং এর থিম ও ভাষা ইম্পোর্ট করুন
+import MarkdownDisplay from '@/components/content-display/MarkdownDisplay';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import CodeMirror from '@uiw/react-codemirror';
 import { ArrowLeft, Eye, EyeOff, Save } from 'lucide-react';
-import MarkdownDisplay from '../_components/content-display/MarkdownDisplay';
+// import MarkdownDisplay from '../_components/content-display/MarkdownDisplay';
 
 const EditorShadcn = dynamic(() => import('@/components/EditorShadcn'), {
   ssr: false,
@@ -43,6 +44,7 @@ export default function PostEditor({
   const router = useRouter();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const isEditMode = mode === 'edit';
+  const { getValidToken } = useAuth();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -263,6 +265,8 @@ export default function PostEditor({
   };
 
   const handleSubmit = async (publishData) => {
+    const token = await getValidToken();
+
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
@@ -272,8 +276,8 @@ export default function PostEditor({
       const formData = createFormData(publishData);
 
       const result = isEditMode
-        ? await updatePostAction(formData)
-        : await createPostAction(formData);
+        ? await updatePostAction(formData, token)
+        : await createPostAction(formData, token);
 
       if (result.success) {
         setMessage(result.message);

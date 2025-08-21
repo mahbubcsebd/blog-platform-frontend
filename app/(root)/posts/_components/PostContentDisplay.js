@@ -1,10 +1,10 @@
 'use client';
 
+import BlockNoteDisplay from '@/components/content-display/BlockNoteDisplay';
+import MarkdownDisplay from '@/components/content-display/MarkdownDisplay';
 import { Suspense } from 'react';
-import BlockNoteDisplay from './content-display/BlockNoteDisplay';
-import MarkdownDisplay from './content-display/MarkdownDisplay';
 
-// সাধারণ HTML কন্টেন্ট দেখানোর জন্য একটি হেল্পার কম্পোনেন্ট
+// show html format
 const HTMLDisplay = ({ content }) => (
   <div
     className="prose prose-lg max-w-none"

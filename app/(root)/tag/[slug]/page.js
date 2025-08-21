@@ -1,7 +1,8 @@
 // import PostContentDisplay from '@/components/PostContentDisplay'; // Adjust path as needed
 import { getPostBySlug } from '@/utils/fetchPosts';
 import Image from 'next/image';
-import PostContentDisplay from '../_components/PostContentDisplay';
+import PostContentDisplay from '../../posts/_components/PostContentDisplay';
+// import PostContentDisplay from '../_components/PostContentDisplay';
 
 const SinglePost = async ({ params }) => {
   const awaitedParams = await params;
