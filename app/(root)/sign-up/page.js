@@ -44,6 +44,7 @@ export default function SignUpPage() {
     firstName: '',
     lastName: '',
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
   });
@@ -98,12 +99,14 @@ export default function SignUpPage() {
       hasNumberOrSpecial,
       passwordsMatch,
     } = passwordValidation;
-    const { firstName, lastName, email, password, confirmPassword } = formData;
+    const { firstName, lastName, email, username, password, confirmPassword } =
+      formData;
 
     return (
       firstName.trim() &&
       lastName.trim() &&
       email.trim() &&
+      username.trim() &&
       password &&
       confirmPassword &&
       minLength &&
@@ -300,6 +303,30 @@ export default function SignUpPage() {
                     required
                     disabled={loading}
                     value={formData.email}
+                    onChange={handleInputChange}
+                    className="h-11 pl-10 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Username Field */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="username"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Username
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="yourusername"
+                    required
+                    disabled={loading}
+                    value={formData.username}
                     onChange={handleInputChange}
                     className="h-11 pl-10 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 transition-colors"
                   />

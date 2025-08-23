@@ -274,3 +274,11 @@
     }
   }
 }
+
+.bn-shadcn .bn-editor {
+  background-color: transparent !important;
+}
+
+.publish-modal-content {
+  max-width: 900px;
+}

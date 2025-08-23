@@ -20,7 +20,7 @@ import {
   EyeOff,
   Loader2,
   Lock,
-  Mail,
+  User,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -35,13 +35,9 @@ export default function SignInPage() {
   const [success, setSuccess] = useState(false);
   const { login, isAuthenticated } = useAuth();
 
-  // Get redirect URL from query params
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
-
-  // Show message if user was redirected from a protected route
   const wasRedirected = searchParams.has('redirect');
 
-  // If already authenticated, redirect to dashboard
   useEffect(() => {
     if (isAuthenticated) {
       router.replace(redirectUrl);
@@ -56,37 +52,32 @@ export default function SignInPage() {
 
     try {
       const formData = new FormData(e.target);
-      const email = formData.get('email');
+      const username = formData.get('username');
       const password = formData.get('password');
 
-      // Validate required fields
-      if (!email || !password) {
-        setError('Email and password are required');
+      if (!username || !password) {
+        setError('Username/Email and password are required');
         return;
       }
 
-      // Use useAuth's login method
-      const result = await login(email, password);
+      const result = await login(username, password);
 
       if (result.success) {
         setSuccess(true);
-
-        // Small delay to show success message, then redirect
         setTimeout(() => {
           router.replace(redirectUrl);
         }, 1000);
       } else {
         setError(result.error);
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (err) {
+      console.error('Login error:', err);
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Show loading spinner if already authenticated
   if (isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
@@ -107,13 +98,12 @@ export default function SignInPage() {
               Sign In
             </CardTitle>
             <CardDescription className="text-center text-gray-600">
-              Enter your credentials to access your account
+              Enter your username or email and password to access your account
             </CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
-              {/* Redirect Notice */}
               {wasRedirected && !error && !success && (
                 <Alert className="border-amber-200 bg-amber-50">
                   <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -123,7 +113,6 @@ export default function SignInPage() {
                 </Alert>
               )}
 
-              {/* Success Message */}
               {success && (
                 <Alert className="border-green-200 bg-green-50">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -133,7 +122,6 @@ export default function SignInPage() {
                 </Alert>
               )}
 
-              {/* Error Message */}
               {error && !success && (
                 <Alert className="border-red-200 bg-red-50">
                   <AlertCircle className="h-4 w-4 text-red-600" />
@@ -143,21 +131,20 @@ export default function SignInPage() {
                 </Alert>
               )}
 
-              {/* Email Field */}
               <div className="space-y-2">
                 <Label
-                  htmlFor="email"
+                  htmlFor="username"
                   className="text-sm font-medium text-gray-700"
                 >
-                  Email Address
+                  Username or Email
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="Enter username or email"
                     required
                     disabled={loading}
                     className="h-11 pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-colors"
@@ -165,7 +152,6 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="space-y-2">
                 <Label
                   htmlFor="password"
@@ -199,7 +185,6 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              {/* Forgot Password Link */}
               <div className="text-right">
                 <a
                   href="/forgot-password"

@@ -8,11 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { CheckCircle, Clock, Globe } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import DateTimePicker from './DateTimePicker';
 import ImageUpload from './ImageUpload';
@@ -32,24 +30,6 @@ const MOCK_TAGS = [
   { value: 'programming', label: 'Programming' },
 ];
 
-// Utility Functions
-const generateSlug = (title) => {
-  if (!title) return '';
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-};
-
-const checkSlugUniqueness = async (slug, currentSlug = null) => {
-  if (!slug) return false;
-  if (slug === currentSlug) return true; // Same slug in edit mode
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return Math.random() > 0.3; // Mock logic - replace with actual API call
-};
-
 const PublishModal = ({
   open,
   onOpenChange,
@@ -65,14 +45,10 @@ const PublishModal = ({
 }) => {
   // Critical: Use consistent initial states to prevent hydration mismatch
   const [mounted, setMounted] = useState(false);
-  const [slug, setSlug] = useState('');
   const [tags, setTags] = useState([]);
   const [excerpt, setExcerpt] = useState('');
-  const [order, setOrder] = useState('0');
-  const [slugStatus, setSlugStatus] = useState('');
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
-  const [publishDate, setPublishDate] = useState(null); // Initialize as null first
+  const [publishDate, setPublishDate] = useState(null);
 
   // Handle mounting to prevent hydration issues
   useEffect(() => {
@@ -80,15 +56,12 @@ const PublishModal = ({
 
     // Initialize states after mounting
     if (initialData) {
-      setSlug(initialData.slug || '');
       setTags(
         initialData.tags
           ? initialData.tags.map((tag) => ({ value: tag, label: tag }))
           : []
       );
       setExcerpt(initialData.excerpt || '');
-      setOrder(initialData.order?.toString() || '0');
-      setIsSlugManuallyEdited(isEditMode);
       setIsScheduling(initialData.status === 'SCHEDULED' || false);
 
       // Handle date only after mounting to prevent SSR mismatch
@@ -99,48 +72,12 @@ const PublishModal = ({
       }
     } else {
       // Default values for create mode
-      setSlug('');
       setTags([]);
       setExcerpt('');
-      setOrder('0');
-      setIsSlugManuallyEdited(false);
       setIsScheduling(false);
       setPublishDate(new Date());
     }
   }, [initialData, isEditMode]);
-
-  // Auto-generate slug from title
-  useEffect(() => {
-    if (!mounted) return;
-
-    if (open && title && !isSlugManuallyEdited) {
-      const newSlug = generateSlug(title);
-      setSlug(newSlug);
-      if (newSlug) {
-        setSlugStatus('checking');
-        checkSlugUniqueness(newSlug, initialData?.slug).then((isUnique) => {
-          setSlugStatus(isUnique ? 'available' : 'taken');
-        });
-      }
-    }
-  }, [open, title, isSlugManuallyEdited, initialData?.slug, mounted]);
-
-  const handleSlugChange = (e) => {
-    if (!mounted) return;
-
-    const newSlug = generateSlug(e.target.value);
-    setSlug(newSlug);
-    setIsSlugManuallyEdited(true);
-
-    if (newSlug) {
-      setSlugStatus('checking');
-      checkSlugUniqueness(newSlug, initialData?.slug).then((isUnique) => {
-        setSlugStatus(isUnique ? 'available' : 'taken');
-      });
-    } else {
-      setSlugStatus('');
-    }
-  };
 
   const handlePublishClick = () => {
     if (!mounted || !publishDate) return;
@@ -148,10 +85,8 @@ const PublishModal = ({
     onPublish({
       isScheduling,
       publishDate,
-      slug,
       tags,
       excerpt,
-      order,
       previewImage,
     });
   };
@@ -162,12 +97,8 @@ const PublishModal = ({
 
     if (!open && !isEditMode) {
       const timer = setTimeout(() => {
-        setSlug('');
         setTags([]);
         setExcerpt('');
-        setOrder('0');
-        setSlugStatus('');
-        setIsSlugManuallyEdited(false);
         setIsScheduling(false);
         setPublishDate(new Date());
         if (clearPreviewImage) clearPreviewImage();
@@ -198,226 +129,171 @@ const PublishModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden bg-gradient-to-br from-white to-slate-50">
-        <DialogHeader className="pb-6">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-            {isEditMode ? 'Update your story' : 'Ready to publish?'}
+      <DialogContent className="publish-modal-content w-[95vw] max-w-6xl h-[90vh] max-h-[90vh] bg-white border-0 shadow-2xl overflow-hidden flex flex-col">
+        <DialogHeader className="pb-6 border-b border-gray-100 flex-shrink-0">
+          <DialogTitle className="text-3xl font-bold text-gray-900">
+            {isEditMode ? 'Update Story' : 'Publish Story'}
           </DialogTitle>
-          <p className="text-slate-600 mt-2">
+          <p className="text-gray-600 text-lg mt-2">
             {isEditMode
-              ? 'Make changes to your published story'
-              : 'Configure your story settings and publish to the world'}
+              ? 'Modify your story settings and update'
+              : 'Configure your story settings before publishing'}
           </p>
         </DialogHeader>
 
-        <div className="space-y-8 py-6 overflow-y-auto max-h-[60vh]">
-          {/* Preview Image Upload */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <ImageUpload
-              label="📸 Story Preview Image"
-              setImage={setPreviewImage}
-              imagePreview={previewImagePreview || ''}
-              className="w-full h-40"
-            />
-            <p className="text-xs text-slate-500 mt-2">
-              This image will be shown when your story is shared on social media
-            </p>
-          </div>
+        {/* Two Column Layout with Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* Preview Image Upload */}
+              <div className="group">
+                <Label className="text-sm font-semibold text-gray-700 mb-4 block">
+                  Story Preview Image
+                </Label>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
+                  <ImageUpload
+                    label=""
+                    setImage={setPreviewImage}
+                    imagePreview={previewImagePreview || ''}
+                    className="w-full h-48"
+                  />
+                  <p className="text-sm text-gray-500 mt-3 text-center">
+                    This image appears when your story is shared on social media
+                  </p>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Slug Input */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <Label
-                htmlFor="slug"
-                className="mb-3 block font-semibold text-slate-700"
-              >
-                🔗 Story URL *
-              </Label>
-              <div className="relative">
-                <Input
-                  id="slug"
-                  value={slug}
-                  onChange={handleSlugChange}
-                  required
-                  placeholder="my-awesome-post"
-                  className={cn(
-                    'pl-4 pr-12 h-12 rounded-lg border-2 transition-all',
-                    slugStatus === 'taken' && 'border-red-300 bg-red-50',
-                    slugStatus === 'available' &&
-                      'border-emerald-300 bg-emerald-50',
-                    slugStatus === 'checking' && 'border-blue-300 bg-blue-50'
-                  )}
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  {slugStatus === 'checking' && (
-                    <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
-                  )}
-                  {slugStatus === 'available' && (
-                    <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  )}
-                  {slugStatus === 'taken' && (
-                    <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">×</span>
+              {/* Tags */}
+              <div className="group">
+                <Label className="text-sm font-semibold text-gray-700 mb-4 block">
+                  Tags
+                </Label>
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 focus-within:border-blue-400 transition-colors">
+                  <MultiSelect
+                    options={MOCK_TAGS}
+                    selected={tags}
+                    onChange={setTags}
+                  />
+                  <p className="text-sm text-gray-500 mt-3">
+                    Help readers discover your story with relevant tags
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Excerpt */}
+              <div className="group">
+                <Label className="text-sm font-semibold text-gray-700 mb-4 block">
+                  Story Excerpt
+                </Label>
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 focus-within:border-blue-400 transition-colors">
+                  <Textarea
+                    value={excerpt}
+                    onChange={(e) => setExcerpt(e.target.value)}
+                    placeholder="Write a compelling description that will hook your readers..."
+                    rows={6}
+                    className="border-0 resize-none focus:ring-0 p-0 text-base"
+                  />
+                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-sm text-gray-500">
+                      Appears in search results and social previews
+                    </p>
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        excerpt.length > 160 ? 'text-red-500' : 'text-gray-400'
+                      )}
+                    >
+                      {excerpt.length}/160
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scheduling */}
+              <div className="group">
+                <Label className="text-sm font-semibold text-gray-700 mb-4 block">
+                  Publication Settings
+                </Label>
+
+                {/* Scheduling Toggle */}
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">
+                        {isScheduling
+                          ? 'Scheduled Publication'
+                          : 'Immediate Publication'}
+                      </h4>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {isScheduling
+                          ? 'Your story will be published at the scheduled time'
+                          : 'Your story will be live immediately after publishing'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsScheduling(!isScheduling)}
+                      className="min-w-[100px] rounded-lg"
+                    >
+                      {isScheduling ? 'Publish Now' : 'Schedule'}
+                    </Button>
+                  </div>
+
+                  {/* Date Time Picker */}
+                  {isScheduling && (
+                    <div className="pt-4 border-t border-gray-100">
+                      <DateTimePicker
+                        date={publishDate}
+                        setDate={setPublishDate}
+                      />
                     </div>
                   )}
                 </div>
               </div>
-
-              {slugStatus === 'checking' && (
-                <p className="text-xs text-blue-600 mt-2 flex items-center">
-                  <Clock className="w-3 h-3 mr-1" />
-                  Checking availability...
-                </p>
-              )}
-              {slugStatus === 'available' && (
-                <p className="text-xs text-emerald-600 mt-2 flex items-center">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Perfect! This URL is available
-                </p>
-              )}
-              {slugStatus === 'taken' && (
-                <p className="text-xs text-red-600 mt-2 flex items-center">
-                  <Globe className="w-3 h-3 mr-1" />
-                  This URL is already taken
-                </p>
-              )}
-
-              <p className="text-xs text-slate-500 mt-2">
-                yoursite.com/posts/
-                <span className="font-mono font-semibold">
-                  {slug || 'your-url'}
-                </span>
-              </p>
-            </div>
-
-            {/* Order */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <Label
-                htmlFor="order"
-                className="mb-3 block font-semibold text-slate-700"
-              >
-                📊 Display Order
-              </Label>
-              <Input
-                id="order"
-                type="number"
-                value={order}
-                onChange={(e) => setOrder(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="h-12 rounded-lg border-2 border-slate-200 focus:border-blue-400"
-              />
-              <p className="text-xs text-slate-500 mt-2">
-                Lower numbers appear first in listings
-              </p>
             </div>
           </div>
-
-          {/* Tags */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <Label
-              htmlFor="tags"
-              className="mb-3 block font-semibold text-slate-700"
-            >
-              🏷️ Tags
-            </Label>
-            <MultiSelect
-              options={MOCK_TAGS}
-              selected={tags}
-              onChange={setTags}
-            />
-            <p className="text-xs text-slate-500 mt-2">
-              Help readers discover your story with relevant tags
-            </p>
-          </div>
-
-          {/* Excerpt */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <Label
-              htmlFor="excerpt"
-              className="mb-3 block font-semibold text-slate-700"
-            >
-              📝 Story Excerpt
-            </Label>
-            <Textarea
-              id="excerpt"
-              value={excerpt}
-              onChange={(e) => setExcerpt(e.target.value)}
-              placeholder="A brief, compelling description that will hook your readers..."
-              rows={4}
-              className="resize-none rounded-lg border-2 border-slate-200 focus:border-blue-400"
-            />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-slate-500">
-                This appears in search results and social media previews
-              </p>
-              <span className="text-xs text-slate-400">
-                {excerpt.length}/160
-              </span>
-            </div>
-          </div>
-
-          {/* Scheduling */}
-          {isScheduling && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200 shadow-sm">
-              <Label className="mb-3 block font-semibold text-slate-700 flex items-center">
-                ⏰ Schedule Publication
-              </Label>
-              <DateTimePicker date={publishDate} setDate={setPublishDate} />
-            </div>
-          )}
         </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-4 pt-6 border-t border-slate-200">
-          <div className="flex flex-col gap-2">
-            {!isScheduling ? (
-              <Button
-                variant="link"
-                className="p-0 h-auto text-blue-600 hover:text-blue-800 font-medium"
-                onClick={() => setIsScheduling(true)}
-              >
-                📅 Schedule for later instead
-              </Button>
-            ) : (
-              <Button
-                variant="link"
-                className="p-0 h-auto text-blue-600 hover:text-blue-800 font-medium"
-                onClick={() => setIsScheduling(false)}
-              >
-                🚀 Publish immediately instead
-              </Button>
-            )}
-            <p className="text-xs text-slate-500">
-              {isScheduling
-                ? 'Your story will be published automatically at the scheduled time'
-                : 'Your story will be live immediately after publishing'}
-            </p>
-          </div>
+        {/* Footer */}
+        <DialogFooter className="border-t border-gray-100 pt-6 flex-shrink-0">
+          <div className="flex justify-between items-center w-full">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-sm text-gray-600">Ready to publish</span>
+              </div>
+            </div>
 
-          <div className="flex space-x-3 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-none rounded-xl border-2 border-slate-200 hover:bg-slate-50"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handlePublishClick}
-              disabled={isSubmitting || !slug || slugStatus === 'taken'}
-              className={cn(
-                'flex-1 sm:flex-none rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200',
-                isScheduling
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                  : 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800'
-              )}
-            >
-              {isSubmitting && (
-                <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              )}
-              {getPublishButtonText()}
-            </Button>
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+                className="px-6 py-2 rounded-lg border-2 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePublishClick}
+                disabled={isSubmitting}
+                className={cn(
+                  'px-8 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200',
+                  isScheduling
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                )}
+              >
+                {isSubmitting && (
+                  <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                )}
+                {getPublishButtonText()}
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>

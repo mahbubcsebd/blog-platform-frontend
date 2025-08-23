@@ -1,7 +1,8 @@
 import {
-  CalendarIcon,
+  BookmarkIcon,
+  ChatBubbleLeftIcon,
   EyeIcon,
-  TagIcon,
+  HandThumbUpIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
@@ -9,18 +10,18 @@ import Link from 'next/link';
 
 function formatDate(dateString) {
   const date = new Date(dateString);
-  return new Intl.DateTimeFormat('bn-BD', {
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   }).format(date);
 }
 
 function formatViews(views) {
-  if (!views) return '০';
+  if (!views) return '0';
   if (views < 1000) return views.toString();
-  if (views < 1000000) return `${(views / 1000).toFixed(1)}হাজার`;
-  return `${(views / 1000000).toFixed(1)}লক্ষ`;
+  if (views < 1000000) return `${(views / 1000).toFixed(1)}K`;
+  return `${(views / 1000000).toFixed(1)}M`;
 }
 
 export default function PostCard({ post, priority = false }) {
@@ -30,17 +31,18 @@ export default function PostCard({ post, priority = false }) {
     slug,
     title,
     excerpt,
-    previewImageUrl, // From API
-    coverImageUrl, // From API
-    publishDate, // From API (instead of published_at)
-    createdAt, // From API
+    previewImageUrl,
+    publishDate,
+    createdAt,
     author,
     topic,
     tags = [],
-    views_count = 0,
-    readTime = 5, // From API
+    readCount = 0,
+    readTime = 1,
     status,
     isScheduled,
+    likes = 0,
+    comments = 0,
   } = post;
 
   const postUrl = `/posts/${slug || id}`;
@@ -53,148 +55,165 @@ export default function PostCard({ post, priority = false }) {
   const displayDate = publishDate || createdAt;
 
   return (
-    <article className="bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
-      {/* Featured Image */}
-      <div className="relative aspect-video overflow-hidden">
-        <Link href={postUrl}>
-          <Image
-            src={imageUrl}
-            alt={title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-            priority={priority}
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        </Link>
-
-        {/* Status Badge */}
-        {(status === 'DRAFT' || isScheduled) && (
-          <div className="absolute top-4 left-4">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                status === 'DRAFT'
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-orange-500 text-white'
-              }`}
-            >
-              {status === 'DRAFT' ? 'খসড়া' : 'নির্ধারিত'}
-            </span>
-          </div>
-        )}
-
-        {/* Topic Badge */}
-        {topic && (
-          <div
-            className={`absolute top-4 ${
-              status === 'DRAFT' || isScheduled ? 'left-20' : 'left-4'
-            }`}
-          >
-            <Link
-              href={`/blog?topic=${
-                typeof topic === 'object' ? topic.slug || topic.id : topic
-              }`}
-              className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-700 transition-colors"
-            >
-              {typeof topic === 'object'
-                ? topic.name || topic.title || 'Topic'
-                : topic}
-            </Link>
-          </div>
-        )}
-
-        {/* Read Time */}
-        <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-          {readTime} মিনিট
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-6">
-        {/* Meta Info */}
-        <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-          {displayDate && (
-            <div className="flex items-center gap-1">
-              <CalendarIcon className="w-3 h-3" />
-              <time dateTime={displayDate}>{formatDate(displayDate)}</time>
-            </div>
-          )}
-
-          {author && (
-            <div className="flex items-center gap-1">
-              <UserIcon className="w-3 h-3" />
-              <span>
-                {typeof author === 'object'
-                  ? `${author.firstName || ''} ${
-                      author.lastName || ''
-                    }`.trim() ||
-                    author.email ||
-                    'Unknown Author'
-                  : author}
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-1">
-            <EyeIcon className="w-3 h-3" />
-            <span>{formatViews(views_count)}</span>
-          </div>
-        </div>
-
-        {/* Title */}
-        <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2">
-          <Link
-            href={postUrl}
-            className="hover:text-blue-600 transition-colors"
-          >
-            {title}
-          </Link>
-        </h3>
-
-        {/* Excerpt */}
-        {excerpt && (
-          <p className="text-gray-600 text-sm line-clamp-3 mb-4">{excerpt}</p>
-        )}
-
-        {/* Tags */}
-        {tags.length > 0 && (
-          <div className="flex items-center gap-2 mb-4">
-            <TagIcon className="w-4 h-4 text-gray-400" />
-            <div className="flex flex-wrap gap-1">
-              {tags.slice(0, 3).map((tag, index) => {
-                const tagSlug =
-                  typeof tag === 'object' ? tag.slug || tag.id : tag;
-                const tagName =
-                  typeof tag === 'object'
-                    ? tag.name || tag.title || 'Tag'
-                    : tag;
-
-                return (
-                  <Link
-                    key={tagSlug || index}
-                    href={`/blog?tag=${tagName}`} // Use tag name for URL as per your API
-                    className="text-xs text-gray-500 hover:text-blue-600 transition-colors"
-                  >
-                    #{tagName}
-                  </Link>
-                );
-              })}
-              {tags.length > 3 && (
-                <span className="text-xs text-gray-400">
-                  +{tags.length - 3}
+    <Link
+      href={postUrl}
+      className="bg-white border-b border-gray-100 transition-all duration-200 py-6 pt-4 rounded-md"
+    >
+      <div className="px-6">
+        <div className="flex gap-6">
+          {/* Content Section */}
+          <div className="flex-1">
+            {/* Author Info */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
+                <UserIcon className="w-4 h-4 text-gray-600" />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="font-medium">
+                  {typeof author === 'object'
+                    ? `${author.firstName || ''} ${
+                        author.lastName || ''
+                      }`.trim() ||
+                      author.email ||
+                      'Unknown Author'
+                    : author || 'Anonymous'}
                 </span>
-              )}
+                {displayDate && (
+                  <>
+                    <span>·</span>
+                    <time dateTime={displayDate}>
+                      {formatDate(displayDate)}
+                    </time>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Read More Button */}
-        <Link
-          href={postUrl}
-          className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium text-sm group-hover:translate-x-1 transition-transform"
-        >
-          আরো পড়ুন →
-        </Link>
+            {/* Title */}
+            <h2 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 leading-tight">
+              <Link
+                href={postUrl}
+                className="hover:text-gray-700 transition-colors"
+              >
+                {title}
+              </Link>
+            </h2>
+
+            {/* Excerpt */}
+            {excerpt && (
+              <p className="text-gray-600 text-base line-clamp-3 mb-4 leading-relaxed">
+                {excerpt}
+              </p>
+            )}
+
+            {/* Meta Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* Topic Badge */}
+                {topic && (
+                  <Link
+                    href={`/blog?topic=${
+                      typeof topic === 'object' ? topic.slug || topic.id : topic
+                    }`}
+                    className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    {typeof topic === 'object'
+                      ? topic.name || topic.title || 'Topic'
+                      : topic}
+                  </Link>
+                )}
+
+                {/* Read Time */}
+                <span className="text-sm text-gray-500">
+                  {readTime} min read
+                </span>
+
+                {/* Status Badge */}
+                {(status === 'DRAFT' || isScheduled) && (
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      status === 'DRAFT'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-orange-100 text-orange-800'
+                    }`}
+                  >
+                    {status === 'DRAFT' ? 'Draft' : 'Scheduled'}
+                  </span>
+                )}
+              </div>
+
+              {/* Action Icons */}
+              <div className="flex items-center gap-4">
+                <button className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors">
+                  <HandThumbUpIcon className="w-4 h-4" />
+                  <span className="text-sm">{likes}</span>
+                </button>
+
+                <button className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors">
+                  <ChatBubbleLeftIcon className="w-4 h-4" />
+                  <span className="text-sm">{comments}</span>
+                </button>
+
+                <div className="flex items-center gap-1 text-gray-500">
+                  <EyeIcon className="w-4 h-4" />
+                  <span className="text-sm">{formatViews(readCount)}</span>
+                </div>
+
+                <button className="text-gray-500 hover:text-gray-700 transition-colors">
+                  <BookmarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Tags */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {tags.slice(0, 4).map((tag, index) => {
+                  const tagSlug =
+                    typeof tag === 'object' ? tag.slug || tag.id : tag;
+                  const tagName =
+                    typeof tag === 'object'
+                      ? tag.name || tag.title || 'Tag'
+                      : tag;
+
+                  return (
+                    <Link
+                      key={tagSlug || index}
+                      href={`/blog?tag=${tagName}`}
+                      className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      #{tagName}
+                    </Link>
+                  );
+                })}
+                {tags.length > 4 && (
+                  <span className="text-sm text-gray-400">
+                    +{tags.length - 4} more
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Image Section */}
+          {imageUrl && imageUrl !== '/images/default-post.jpg' && (
+            <div className="flex-shrink-0">
+              <Link href={postUrl}>
+                <div className="w-32 h-32 relative overflow-hidden rounded-lg">
+                  <Image
+                    src={imageUrl}
+                    alt={title}
+                    fill
+                    className="object-cover hover:scale-105 transition-transform duration-300"
+                    priority={priority}
+                    sizes="128px"
+                  />
+                </div>
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
-    </article>
+    </Link>
   );
 }

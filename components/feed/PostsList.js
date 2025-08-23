@@ -18,9 +18,9 @@ export default async function PostsList({ filters }) {
   const totalCount = result.count || 0;
 
   return (
-    <div>
-      <p>{totalCount} টি পোস্ট পাওয়া গেছে</p>
-      <div className="grid grid-cols-3 gap-4">
+    <div className="">
+      <p className="mb-5">{totalCount} Posts found.</p>
+      <div className="grid grid-cols-1 gap-4">
         {posts.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}

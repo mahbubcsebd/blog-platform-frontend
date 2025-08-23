@@ -16,7 +16,6 @@ import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import CodeMirror from '@uiw/react-codemirror';
 import { ArrowLeft, Eye, EyeOff, Save } from 'lucide-react';
-// import MarkdownDisplay from '../_components/content-display/MarkdownDisplay';
 
 const EditorShadcn = dynamic(() => import('@/components/EditorShadcn'), {
   ssr: false,
@@ -63,7 +62,6 @@ export default function PostEditor({
         htmlContent: initialData.htmlContent,
         slug: initialData.slug,
         excerpt: initialData.excerpt,
-        order: initialData.order,
         tags: initialData.tags || [],
         status: initialData.status,
         publishDate: initialData.publishDate,
@@ -107,7 +105,7 @@ export default function PostEditor({
   // State management
   const [title, setTitle] = useState(transformedInitialData?.title || '');
   const [contentType, setContentType] = useState(
-    transformedInitialData?.contentType || 'MARKDOWN'
+    transformedInitialData?.contentType || 'EDITOR'
   );
   const [editorContent, setEditorContent] = useState(getInitialEditorContent);
   const [markdownContent, setMarkdownContent] = useState(
@@ -213,9 +211,8 @@ export default function PostEditor({
     setShowPublishModal(false);
   };
 
-  const validateForm = (publishData) => {
+  const validateForm = () => {
     if (!title.trim()) throw new Error('Title is required');
-    if (!publishData.slug.trim()) throw new Error('URL slug is required');
 
     const hasContent =
       contentType === 'EDITOR'
@@ -228,8 +225,6 @@ export default function PostEditor({
   const createFormData = (publishData) => {
     const formData = new FormData();
     formData.set('title', title.trim());
-    formData.set('slug', publishData.slug.trim());
-    formData.set('order', publishData.order || '0');
     formData.set('excerpt', publishData.excerpt || '');
     formData.set('contentType', contentType);
 
@@ -272,7 +267,7 @@ export default function PostEditor({
     setMessage(null);
 
     try {
-      validateForm(publishData);
+      validateForm();
       const formData = createFormData(publishData);
 
       const result = isEditMode
@@ -280,13 +275,16 @@ export default function PostEditor({
         : await createPostAction(formData, token);
 
       if (result.success) {
+        console.log(result);
         setMessage(result.message);
         setHasUnsavedChanges(false);
+        router.push(`/posts/${result.data.slug}`);
         resetForm();
 
-        setTimeout(() => {
-          router.push(`/posts/${publishData.slug}`);
-        }, 1000);
+        // Navigate to posts list instead of specific post slug
+        // setTimeout(() => {
+        //   router.push('/dashboard/posts');
+        // }, 1000);
       } else {
         setError(result.error || 'Something went wrong.');
       }
@@ -309,13 +307,8 @@ export default function PostEditor({
 
     try {
       const draftData = {
-        slug: title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, ''),
         tags: [],
         excerpt: '',
-        order: '0',
         isScheduling: false,
         publishDate: new Date(),
       };
@@ -323,9 +316,10 @@ export default function PostEditor({
       const formData = createFormData(draftData);
       formData.set('status', 'DRAFT');
 
+      const token = await getValidToken();
       const result = isEditMode
-        ? await updatePostAction(formData)
-        : await createPostAction(formData);
+        ? await updatePostAction(formData, token)
+        : await createPostAction(formData, token);
 
       if (result.success) {
         setMessage('Draft saved successfully!');
@@ -510,30 +504,23 @@ export default function PostEditor({
 
         <div className="space-y-10">
           {/* Enhanced Title Input */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden">
-            <div className="p-8">
+          <div className="">
+            <div className="">
               <TextareaAutosize
                 name="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={
-                  isEditMode
-                    ? 'Update your story title...'
-                    : 'Tell your story with a compelling title...'
+                  isEditMode ? 'Update your story title...' : 'Story title'
                 }
                 className="w-full text-4xl md:text-5xl lg:text-6xl font-bold border-none outline-none resize-none bg-transparent focus:ring-0 text-slate-900 placeholder-slate-400 leading-tight"
                 required
               />
-              {title.length > 0 && (
-                <div className="mt-4 text-sm text-slate-500">
-                  {title.length} characters
-                </div>
-              )}
             </div>
           </div>
 
           {/* Enhanced Content Editor */}
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden">
+          <div className="">
             {contentType === 'MARKDOWN' ? (
               <div
                 className={`${
@@ -590,12 +577,7 @@ export default function PostEditor({
               </div>
             ) : (
               <div>
-                <div className="p-4 bg-slate-50 border-b border-slate-200">
-                  <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wider">
-                    Rich Text Editor
-                  </h3>
-                </div>
-                <div className="p-8 min-h-[500px]">
+                <div className="min-h-[500px]">
                   <EditorShadcn
                     onChange={handleEditorChange}
                     editable={true}

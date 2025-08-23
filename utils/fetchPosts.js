@@ -5,12 +5,6 @@ const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
  */
 export async function createPost(formData, accessToken) {
   try {
-    if (!baseUrl) {
-      throw new Error('Base URL is not configured');
-    }
-
-    console.log(formData);
-
     const res = await fetch(`${baseUrl}/posts`, {
       method: 'POST',
       body: formData,
@@ -112,10 +106,6 @@ export async function deletePost(id) {
  */
 export async function getAllPosts(filters = {}) {
   try {
-    if (!baseUrl) {
-      throw new Error('Base URL is not configured');
-    }
-
     // Build query parameters
     const queryParams = new URLSearchParams();
 
@@ -136,9 +126,9 @@ export async function getAllPosts(filters = {}) {
         'Content-Type': 'application/json',
       },
       // Add cache control for better performance
-      next: {
-        revalidate: 60, // Cache for 1 minute
-      },
+      // next: {
+      //   revalidate: 60, // Cache for 1 minute
+      // },
     });
 
     if (!response.ok) {
@@ -146,6 +136,8 @@ export async function getAllPosts(filters = {}) {
     }
 
     const data = await response.json();
+
+    console.log('data' + data);
 
     if (!data.success) {
       throw new Error(data.message || data.error || 'Failed to fetch posts');

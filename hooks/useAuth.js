@@ -72,14 +72,14 @@ export const AuthProvider = ({ children }) => {
   // Login / Register
   // ------------------------------
   const login = useCallback(
-    async (email, password) => {
+    async (username, password) => {
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ username, password }),
             credentials: 'include',
           }
         );

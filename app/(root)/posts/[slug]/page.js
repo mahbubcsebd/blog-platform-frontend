@@ -10,8 +10,6 @@ const SinglePost = async ({ params }) => {
   try {
     const res = await getPostBySlug(slug);
 
-    console.log(res.data);
-
     if (!res.data) {
       return (
         <div className="container mx-auto px-4 py-8">
@@ -109,36 +107,6 @@ const SinglePost = async ({ params }) => {
         <main className="prose-wrapper">
           <PostContentDisplay post={post} />
         </main>
-
-        {/* Debug Information (remove in production) */}
-        {process.env.NODE_ENV === 'development' && (
-          <details className="mt-12 p-4 bg-gray-100 rounded-lg">
-            <summary className="cursor-pointer font-medium text-gray-700 mb-2">
-              Debug Info (Development Only)
-            </summary>
-            <pre className="text-xs text-gray-600 overflow-auto">
-              {JSON.stringify(
-                {
-                  id: post.id,
-                  title: post.title,
-                  slug: post.slug,
-                  hasMarkdown: !!post.markdown,
-                  hasRichContent: !!post.richContent,
-                  hasHtmlContent: !!post.htmlContent,
-                  hasExcerpt: !!post.excerpt,
-                  contentLengths: {
-                    markdown: post.markdown?.length || 0,
-                    richContent: post.richContent?.length || 0,
-                    htmlContent: post.htmlContent?.length || 0,
-                    excerpt: post.excerpt?.length || 0,
-                  },
-                },
-                null,
-                2
-              )}
-            </pre>
-          </details>
-        )}
       </article>
     );
   } catch (error) {
