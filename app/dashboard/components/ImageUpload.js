@@ -154,6 +154,8 @@ export default function ImageUpload({
         >
           <Image
             src={localPreview}
+            width={400}
+            height={400}
             alt="Preview"
             className="w-full h-full object-cover"
           />

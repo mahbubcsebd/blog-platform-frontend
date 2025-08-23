@@ -1,10 +1,11 @@
 'use client';
 
+import PostEditor from '@/app/dashboard/components/PostEditor';
 // import PostEditor from '@/components/PostEditor';
 import { getPostBySlug } from '@/utils/fetchPosts';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import PostEditor from '../../components/PostEditor';
+// import PostEditor from '../../components/PostEditor';
 
 // আপনার API function import করুন
 // import { getPostBySlug } from '@/actions/post';

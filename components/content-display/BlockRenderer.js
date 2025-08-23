@@ -123,6 +123,8 @@ const BlockRenderer = ({ block }) => {
           <Image
             src={src}
             alt={alt}
+            width={1200}
+            height={1200}
             className="max-w-full h-auto rounded-xl shadow-lg border border-gray-200"
           />
           {caption && (

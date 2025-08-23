@@ -26,35 +26,6 @@ export async function createPost(formData, accessToken) {
   }
 }
 
-/**
- * Create Post
- */
-// export async function createPost(formData, accessToken) {
-//   try {
-//     const res = await fetch(`${baseUrl}/posts`, {
-//       method: 'POST',
-//       body: formData,
-//       headers: {
-//         Authorization: `Bearer ${accessToken}`, // ✅ add token
-//       },
-//     });
-
-//     if (!res.ok) {
-//       const errorText = await res.text();
-//       throw new Error(`Failed to create post: ${errorText}`);
-//     }
-
-//     const data = await res.json();
-//     return { success: true, data };
-//   } catch (error) {
-//     console.error('Error creating post:', error);
-//     return { success: false, error: error.message };
-//   }
-// }
-
-/**
- * Update Post by ID
- */
 export async function updatePost(id, formData, accessToken) {
   try {
     const res = await fetch(`${baseUrl}/posts/${encodeURIComponent(id)}`, {
@@ -78,9 +49,7 @@ export async function updatePost(id, formData, accessToken) {
   }
 }
 
-/**
- * Delete Post by ID
- */
+// delete post by id
 export async function deletePost(id) {
   try {
     const res = await fetch(`${baseUrl}/posts/${encodeURIComponent(id)}`, {
@@ -101,9 +70,7 @@ export async function deletePost(id) {
   }
 }
 
-/**
- * Fetch posts with filters, pagination and error handling
- */
+// Fetch posts with filters, pagination and error handling
 export async function getAllPosts(filters = {}) {
   try {
     // Build query parameters
@@ -164,9 +131,7 @@ export async function getAllPosts(filters = {}) {
   }
 }
 
-/**
- * Fetch single post by slug
- */
+// get single post
 export async function getPostBySlug(slug, includeContent = true) {
   try {
     if (!baseUrl) {

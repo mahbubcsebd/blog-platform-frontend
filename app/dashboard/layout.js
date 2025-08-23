@@ -100,6 +100,8 @@ const DashboardLayout = ({ children }) => {
                 <button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100">
                   <Image
                     src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face"
+                    width={1200}
+                    height={1200}
                     alt="Profile"
                     className="w-8 h-8 rounded-full"
                   />
@@ -130,7 +132,7 @@ const DashboardLayout = ({ children }) => {
           <aside
             className={`${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } lg:translate-x-0 fixed lg:static w-64 h-full bg-white shadow-lg transition-transform duration-300 ease-in-out z-30`}
+            } lg:translate-x-0 fixed lg:static w-64 h-full bg-white shadow-lg transition-transform duration-300 ease-in-out z-30 min-h-screen`}
           >
             <nav className="p-6">
               <div className="space-y-2">
