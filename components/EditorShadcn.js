@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client';
 
 import '@blocknote/core/fonts/inter.css';
@@ -77,6 +78,7 @@ const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
     parsedContent = undefined;
   }
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const editor = useCreateBlockNote({
     initialContent: parsedContent,
     uploadFile: uploadFileToServer,

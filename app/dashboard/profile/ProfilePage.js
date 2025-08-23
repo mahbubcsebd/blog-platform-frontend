@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const ProfilePage = () => {
   const { user, loading, isAuthenticated, logout, authenticatedFetch } =
@@ -34,7 +34,7 @@ const ProfilePage = () => {
   }, [loading, isAuthenticated, router]);
 
   // Fetch profile data
-  const fetchProfileData = async () => {
+  const fetchProfileData = useCallback(async () => {
     if (!isAuthenticated) return;
 
     setProfileLoading(true);
@@ -67,11 +67,11 @@ const ProfilePage = () => {
     } finally {
       setProfileLoading(false);
     }
-  };
+  }, [isAuthenticated, authenticatedFetch]);
 
   useEffect(() => {
     if (isAuthenticated) fetchProfileData();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchProfileData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -140,7 +140,7 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Header */}
+        {/* Header and Form */}
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <div>
@@ -206,7 +206,6 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Message */}
           {message && (
             <div className="mx-6 mt-4">
               <div
@@ -221,7 +220,6 @@ const ProfilePage = () => {
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
             {/* Basic Info */}
             <div>
@@ -229,37 +227,24 @@ const ProfilePage = () => {
                 Basic Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {['firstName', 'lastName', 'phone', 'address'].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                    </label>
+                    <input
+                      type="text"
+                      name={field}
+                      value={profileData[field]}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        !isEditing ? 'bg-gray-50 text-gray-600' : 'bg-white'
+                      }`}
+                    />
+                  </div>
+                ))}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={profileData.firstName}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      !isEditing ? 'bg-gray-50 text-gray-600' : 'bg-white'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={profileData.lastName}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      !isEditing ? 'bg-gray-50 text-gray-600' : 'bg-white'
-                    }`}
-                  />
-                </div>
-                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email Address
                   </label>
@@ -278,33 +263,20 @@ const ProfilePage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={profileData.phone}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      !isEditing ? 'bg-gray-50 text-gray-600' : 'bg-white'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address
+                    Username
                   </label>
                   <input
                     type="text"
-                    name="address"
-                    value={profileData.address}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      !isEditing ? 'bg-gray-50 text-gray-600' : 'bg-white'
-                    }`}
+                    name="username"
+                    value={profileData.username || ''}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
                   />
+                  {isEditing && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Username cannot be changed
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

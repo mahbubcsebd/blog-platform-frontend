@@ -1,6 +1,7 @@
 // app/dashboard/layout.js
 'use client';
 import DashboardRouteGuard from '@/components/guards/DashboardRouteGuard';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -97,7 +98,7 @@ const DashboardLayout = ({ children }) => {
               {/* Profile Dropdown */}
               <div className="relative">
                 <button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100">
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face"
                     alt="Profile"
                     className="w-8 h-8 rounded-full"

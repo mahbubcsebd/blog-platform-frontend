@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import PublishModal from './PublishModal';
 
@@ -53,21 +53,23 @@ export default function PostEditor({
   }, [authLoading, isAuthenticated, router]);
 
   // Transform the data structure to match component expectations
-  const transformedInitialData = initialData
-    ? {
-        id: initialData.id,
-        title: initialData.title,
-        content: initialData.content,
-        contentType: initialData.contentType,
-        htmlContent: initialData.htmlContent,
-        slug: initialData.slug,
-        excerpt: initialData.excerpt,
-        tags: initialData.tags || [],
-        status: initialData.status,
-        publishDate: initialData.publishDate,
-        previewImage: initialData.previewImageUrl || null,
-      }
-    : null;
+  const transformedInitialData = useMemo(() => {
+    if (!initialData) return null;
+
+    return {
+      id: initialData.id,
+      title: initialData.title,
+      content: initialData.content,
+      contentType: initialData.contentType,
+      htmlContent: initialData.htmlContent,
+      slug: initialData.slug,
+      excerpt: initialData.excerpt,
+      tags: initialData.tags || [],
+      status: initialData.status,
+      publishDate: initialData.publishDate,
+      previewImage: initialData.previewImageUrl || null,
+    };
+  }, [initialData]);
 
   // Safe parsing for editor content
   const getInitialEditorContent = () => {
@@ -137,7 +139,6 @@ export default function PostEditor({
       );
       setPreviewImagePreview(transformedInitialData.previewImage || null);
 
-      // Reset editor content for edit mode
       if (transformedInitialData.contentType === 'EDITOR') {
         try {
           const parsedContent = JSON.parse(transformedInitialData.content);
@@ -152,7 +153,7 @@ export default function PostEditor({
         }
       }
     }
-  }, [initialData, transformedInitialData]);
+  }, [transformedInitialData]);
 
   // Track changes for unsaved indicator
   useEffect(() => {

@@ -24,9 +24,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -186,12 +186,12 @@ export default function SignInPage() {
               </div>
 
               <div className="text-right">
-                <a
+                <Link
                   href="/forgot-password"
                   className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                 >
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </CardContent>
 
@@ -229,5 +229,26 @@ export default function SignInPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function SignInPageFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main component wrapped with Suspense
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<SignInPageFallback />}>
+      <SignInForm />
+    </Suspense>
   );
 }

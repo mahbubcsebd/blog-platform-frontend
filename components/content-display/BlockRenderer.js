@@ -1,4 +1,5 @@
 import { Check, Copy } from 'lucide-react';
+import Image from 'next/image';
 import { useState } from 'react';
 
 const CodeBlock = ({ textContent, language = 'text' }) => {
@@ -119,7 +120,7 @@ const BlockRenderer = ({ block }) => {
       const caption = block.props?.caption;
       return src ? (
         <figure className="mb-6">
-          <img
+          <Image
             src={src}
             alt={alt}
             className="max-w-full h-auto rounded-xl shadow-lg border border-gray-200"

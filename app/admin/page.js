@@ -1,5 +1,6 @@
 // app/admin/page.js
 'use client';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -231,7 +232,7 @@ const AdminDashboardPage = () => {
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center space-x-4">
-                      <img
+                      <Image
                         src={`https://ui-avatars.com/api/?name=${user.name}&background=random`}
                         alt={user.name}
                         className="w-10 h-10 rounded-full"

@@ -1,7 +1,7 @@
 'use client';
 
-import { getAllPosts } from '@/utils/fetchPosts'; // Updated API import
-import { useEffect, useState } from 'react';
+import { getAllPosts } from '@/utils/fetchPosts';
+import { useCallback, useEffect, useState } from 'react';
 import PostCard from './PostCard';
 
 export default function PostsGrid({
@@ -15,44 +15,13 @@ export default function PostsGrid({
   const [error, setError] = useState(null);
   const [currentOffset, setCurrentOffset] = useState(initialPosts.length);
 
-  const LIMIT = 6; // fixed per-page limit
+  const LIMIT = 6; // per-page limit
 
-  const loadMorePosts = async () => {
-    if (loading || !hasMore) return;
-
+  // Fetch posts with proper callback
+  const loadInitialPosts = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    try {
-      const result = await getAllPosts({
-        ...filters,
-        status: 'PUBLISHED',
-        limit: LIMIT,
-        offset: currentOffset,
-        cache: 'no-store', // always fresh on load more
-      });
-
-      if (result.success && result.data?.length > 0) {
-        setPosts((prev) => [...prev, ...result.data]);
-        setCurrentOffset((prev) => prev + result.data.length);
-
-        if (result.data.length < LIMIT) {
-          setHasMore(false);
-        }
-      } else {
-        setHasMore(false);
-        if (result.error) setError(result.error);
-      }
-    } catch (err) {
-      console.error('Error loading more posts:', err);
-      setError('পোস্ট লোড করতে সমস্যা হয়েছে');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadInitialPosts = async () => {
-    setLoading(true);
     try {
       const result = await getAllPosts({
         ...filters,
@@ -68,15 +37,49 @@ export default function PostsGrid({
         setHasMore(result.data.length === LIMIT);
       } else {
         setError(result.error || 'পোস্ট লোড করতে সমস্যা হয়েছে');
+        setHasMore(false);
       }
     } catch (err) {
+      console.error('Error fetching posts:', err);
+      setError('পোস্ট লোড করতে সমস্যা হয়েছে');
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  const loadMorePosts = useCallback(async () => {
+    if (loading || !hasMore) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await getAllPosts({
+        ...filters,
+        status: 'PUBLISHED',
+        limit: LIMIT,
+        offset: currentOffset,
+        cache: 'no-store',
+      });
+
+      if (result.success && result.data?.length > 0) {
+        setPosts((prev) => [...prev, ...result.data]);
+        setCurrentOffset((prev) => prev + result.data.length);
+        if (result.data.length < LIMIT) setHasMore(false);
+      } else {
+        setHasMore(false);
+        if (result.error) setError(result.error);
+      }
+    } catch (err) {
+      console.error('Error loading more posts:', err);
       setError('পোস্ট লোড করতে সমস্যা হয়েছে');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, loading, hasMore, currentOffset]);
 
-  // Reset when filters change
+  // Reload posts when filters change
   useEffect(() => {
     if (Object.keys(filters).length > 0) {
       setPosts([]);
@@ -84,8 +87,7 @@ export default function PostsGrid({
       setHasMore(true);
       loadInitialPosts();
     }
-    //react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, loadInitialPosts]);
 
   if (posts.length === 0 && !loading) {
     return (

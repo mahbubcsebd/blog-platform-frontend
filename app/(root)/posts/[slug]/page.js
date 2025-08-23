@@ -18,7 +18,7 @@ const SinglePost = async ({ params }) => {
               Post Not Found
             </h1>
             <p className="text-gray-600">
-              The post you're looking for doesn't exist.
+              The post you are looking for doesn't exist.
             </p>
           </div>
         </div>

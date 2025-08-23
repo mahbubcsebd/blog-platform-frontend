@@ -1,6 +1,7 @@
 // app/admin/layout.js
 'use client';
 import AdminRouteGuard from '@/components/guards/AdminRouteGuard';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -133,7 +134,7 @@ const AdminLayout = ({ children }) => {
 
               {/* Admin Profile */}
               <div className="flex items-center space-x-3">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face"
                   alt="Admin"
                   className="w-10 h-10 rounded-full border-2 border-blue-500"

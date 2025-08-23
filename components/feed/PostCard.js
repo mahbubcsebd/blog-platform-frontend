@@ -48,8 +48,7 @@ export default function PostCard({ post, priority = false }) {
   const postUrl = `/posts/${slug || id}`;
 
   // Use previewImageUrl first, then coverImageUrl, then default
-  const imageUrl =
-    previewImageUrl || coverImageUrl || '/images/default-post.jpg';
+  const imageUrl = previewImageUrl || '/images/default-post.jpg';
 
   // Use publishDate if available, otherwise createdAt
   const displayDate = publishDate || createdAt;

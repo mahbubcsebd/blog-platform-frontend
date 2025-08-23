@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Check, Upload, X } from 'lucide-react';
+import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 
@@ -151,7 +152,7 @@ export default function ImageUpload({
         <div
           className={cn('relative group rounded-xl overflow-hidden', className)}
         >
-          <img
+          <Image
             src={localPreview}
             alt="Preview"
             className="w-full h-full object-cover"

@@ -27,9 +27,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
-export default function SignUpPage() {
+function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -88,7 +88,7 @@ export default function SignUpPage() {
       hasNumberOrSpecial: /[\d\W]/.test(password),
       passwordsMatch: password.length > 0 && password === confirmPassword,
     });
-  }, [formData.password, formData.confirmPassword]);
+  }, [formData]);
 
   // Check if form is valid
   const isFormValid = () => {
@@ -489,5 +489,26 @@ export default function SignUpPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function SignUpPageFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-emerald-600" />
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main component wrapped with Suspense
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<SignUpPageFallback />}>
+      <SignUpForm />
+    </Suspense>
   );
 }
