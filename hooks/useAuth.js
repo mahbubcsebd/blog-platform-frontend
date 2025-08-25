@@ -1,4 +1,4 @@
-// hooks/useAuth.js - COMPLETE TOKEN MANAGEMENT SYSTEM
+// hooks/useAuth.js - PROPERLY OPTIMIZED VERSION
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -7,358 +7,302 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from 'react';
 
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [accessToken, setAccessToken] = useState(null);
-  const [tokenExpiry, setTokenExpiry] = useState(null);
   const router = useRouter();
-  const refreshTimeoutRef = useRef(null);
-  const isRefreshing = useRef(false);
-  const refreshPromise = useRef(null);
+  const [user, setUser] = useState(null);
+  const [accessToken, setAccessToken] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [tokenExpiry, setTokenExpiry] = useState(null); // Track token expiry
 
-  // Set token data in context
-  const setTokenData = useCallback((token, expiresIn, userData) => {
+  // ------------------------------
+  // Set/Clear Auth Data
+  // ------------------------------
+  const setAuthData = useCallback(({ token, userData, expiresIn }) => {
     setAccessToken(token);
     setUser(userData);
 
-    const expiryTime = Date.now() + expiresIn * 1000;
-    setTokenExpiry(expiryTime);
+    console.log('this is set user', userData);
 
-    // Clear existing timeout
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
+    // Calculate expiry time (subtract 1 minute for safety margin)
+    if (expiresIn || token) {
+      const expiryTime =
+        Date.now() + (expiresIn ? expiresIn * 1000 - 60000 : 14 * 60 * 1000);
+      setTokenExpiry(expiryTime);
     }
-
-    // Schedule token refresh 2 minutes before expiry
-    const refreshTime = Math.max(10000, (expiresIn - 120) * 1000); // minimum 10 seconds
-    refreshTimeoutRef.current = setTimeout(() => {
-      console.log('🔄 Auto-refreshing token...');
-      refreshAccessToken();
-    }, refreshTime);
   }, []);
 
-  // Clear all auth data
   const clearAuthData = useCallback(() => {
-    setUser(null);
     setAccessToken(null);
+    setUser(null);
     setTokenExpiry(null);
-
-    if (refreshTimeoutRef.current) {
-      clearTimeout(refreshTimeoutRef.current);
-    }
   }, []);
 
-  // Check if token is expired or about to expire
+  // ------------------------------
+  // Check if token is expired
+  // ------------------------------
   const isTokenExpired = useCallback(() => {
     if (!tokenExpiry) return true;
-    // Consider expired if less than 1 minute remaining
-    return Date.now() >= tokenExpiry - 60000;
+    return Date.now() >= tokenExpiry;
   }, [tokenExpiry]);
 
-  // Refresh access token using refresh token (httpOnly cookie)
+  // ------------------------------
+  // Refresh Token (only when needed)
+  // ------------------------------
   const refreshAccessToken = useCallback(async () => {
-    // Prevent multiple simultaneous refresh attempts
-    if (isRefreshing.current) {
-      return refreshPromise.current;
-    }
-
-    isRefreshing.current = true;
-    refreshPromise.current = (async () => {
-      try {
-        console.log('🔄 Refreshing access token...');
-
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
-          {
-            method: 'POST',
-            credentials: 'include', // Send httpOnly refresh token cookie
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          console.log('✅ Token refreshed successfully');
-
-          // Update context with new tokens
-          setTokenData(
-            data.data.accessToken,
-            data.data.expiresIn || 900,
-            data.data.user
-          );
-
-          return data.data.accessToken;
-        } else {
-          console.log('❌ Token refresh failed:', data.message);
-
-          // Refresh token is invalid/expired, clear auth data
-          clearAuthData();
-          return null;
+    try {
+      console.log('🔄 Refreshing access token...');
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
         }
-      } catch (error) {
-        console.error('❌ Token refresh error:', error);
+      );
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const { accessToken: newToken, user: userData, expiresIn } = data.data;
+        console.log(userData, data.data);
+        setAuthData({
+          token: newToken,
+          userData,
+          expiresIn: expiresIn || 15 * 60, // Default 15 minutes if not provided
+        });
+        console.log('✅ Token refreshed successfully');
+        return newToken;
+      } else {
+        console.log('❌ Token refresh failed:', data.message);
         clearAuthData();
         return null;
-      } finally {
-        isRefreshing.current = false;
-        refreshPromise.current = null;
       }
-    })();
+    } catch (err) {
+      console.error('❌ Token refresh error:', err);
+      clearAuthData();
+      return null;
+    }
+  }, [setAuthData, clearAuthData]);
 
-    return refreshPromise.current;
-  }, [setTokenData, clearAuthData]);
-
-  // Get valid access token (with automatic refresh if needed)
+  // ------------------------------
+  // Get Valid Token (smart token management)
+  // ------------------------------
   const getValidToken = useCallback(async () => {
-    // If token exists and not expired, return it
-    if (accessToken && !isTokenExpired()) {
-      return accessToken;
+    // If no token at all, try to refresh from httpOnly cookie
+    if (!accessToken) {
+      console.log('🔍 No access token found, attempting refresh...');
+      return await refreshAccessToken();
     }
 
-    // Token is expired or doesn't exist, try to refresh
-    console.log('🔄 Access token expired/missing, refreshing...');
-    return await refreshAccessToken();
+    // If token exists but expired, refresh it
+    if (isTokenExpired()) {
+      console.log('⏰ Token expired, refreshing...');
+      return await refreshAccessToken();
+    }
+
+    // Token is valid, use it
+    console.log('✅ Using existing valid token');
+    return accessToken;
   }, [accessToken, isTokenExpired, refreshAccessToken]);
 
-  // Login function
+  // ------------------------------
+  // Login / Register
+  // ------------------------------
   const login = useCallback(
-    async (email, password) => {
+    async (username, password) => {
       try {
-        const response = await fetch(
+        const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password }),
-            credentials: 'include', // Receive httpOnly refresh token cookie
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+            credentials: 'include',
           }
         );
+        const data = await res.json();
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          console.log('✅ Login successful');
-
-          // Store access token and user data in context
-          setTokenData(
-            data.data.accessToken,
-            data.data.expiresIn || 900,
-            data.data.user
-          );
-
-          return {
-            success: true,
-            message: data.message,
-            user: data.data.user,
-          };
-        } else {
-          return {
-            success: false,
-            error: data.message || 'Login failed',
-          };
-        }
-      } catch (error) {
-        console.error('❌ Login error:', error);
-        return {
-          success: false,
-          error: 'Network error. Please try again.',
-        };
+        if (res.ok && data.success) {
+          const { accessToken, user, expiresIn } = data.data;
+          setAuthData({
+            token: accessToken,
+            userData: user,
+            expiresIn: expiresIn || 15 * 60,
+          });
+          return { success: true, user };
+        } else return { success: false, error: data.message };
+      } catch (err) {
+        return { success: false, error: 'Network error' };
       }
     },
-    [setTokenData]
+    [setAuthData]
   );
 
-  // Register function
   const register = useCallback(
     async (userData) => {
       try {
-        const response = await fetch(
+        const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/register`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData),
             credentials: 'include',
           }
         );
+        const data = await res.json();
 
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          console.log('✅ Registration successful');
-
-          setTokenData(
-            data.data.accessToken,
-            data.data.expiresIn || 900,
-            data.data.user
-          );
-
-          return {
-            success: true,
-            message: data.message,
-            user: data.data.user,
-          };
-        } else {
-          return {
-            success: false,
-            error: data.message || 'Registration failed',
-          };
-        }
-      } catch (error) {
-        console.error('❌ Register error:', error);
-        return {
-          success: false,
-          error: 'Network error. Please try again.',
-        };
+        if (res.ok && data.success) {
+          const { accessToken, user, expiresIn } = data.data;
+          setAuthData({
+            token: accessToken,
+            userData: user,
+            expiresIn: expiresIn || 15 * 60,
+          });
+          return { success: true, user };
+        } else return { success: false, error: data.message };
+      } catch (err) {
+        return { success: false, error: 'Network error' };
       }
     },
-    [setTokenData]
+    [setAuthData]
   );
 
-  // Logout function
-  // Logout function
+  // ------------------------------
+  // Logout
+  // ------------------------------
   const logout = useCallback(async () => {
     try {
-      // Get valid access token from context
-      const token = accessToken;
-
-      if (!token) {
-        console.warn(
-          'No access token available, sending only refresh token cookie'
-        );
-      }
-
       await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/logout`, {
         method: 'POST',
-        credentials: 'include', // Send httpOnly refresh token cookie
+        credentials: 'include',
         headers: {
+          Authorization: accessToken ? `Bearer ${accessToken}` : '',
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-    } catch (error) {
-      console.error('❌ Logout API error:', error);
+    } catch (err) {
+      console.error('Logout error:', err);
     } finally {
-      // Always clear frontend auth data
       clearAuthData();
       router.push('/sign-in');
     }
   }, [accessToken, clearAuthData, router]);
 
-  // Check auth status on app load
-  const checkAuthStatus = useCallback(async () => {
-    setLoading(true);
-
-    try {
-      // Try to refresh token to see if user is still authenticated
-      const token = await refreshAccessToken();
-
-      if (!token) {
-        console.log('❌ No valid authentication found');
-        clearAuthData();
-      }
-    } catch (error) {
-      console.error('❌ Auth check failed:', error);
-      clearAuthData();
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshAccessToken, clearAuthData]);
-
-  // Initialize auth on mount
+  // ------------------------------
+  // Initialize Auth on Mount (ONE TIME ONLY)
+  // ------------------------------
   useEffect(() => {
-    checkAuthStatus();
+    let mounted = true;
 
-    // Cleanup on unmount
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
+    const initializeAuth = async () => {
+      try {
+        console.log('🚀 Initializing auth...');
+        // Only try to refresh if we don't have a valid token
+        if (!accessToken || isTokenExpired()) {
+          await refreshAccessToken();
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
-  }, [checkAuthStatus]);
 
-  const value = {
-    user,
-    accessToken,
-    loading,
-    isAuthenticated: !!user && !!accessToken && !isTokenExpired(),
-    login,
-    loginWithCredentials: login, // Alias for backward compatibility
-    register,
-    logout,
-    refreshToken: refreshAccessToken,
-    getValidToken,
-    isTokenExpired,
-  };
+    initializeAuth();
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - only run once
+
+  // ------------------------------
+  // Authenticated Fetch (with smart retry)
+  // ------------------------------
+  const authenticatedFetch = useCallback(
+    async (url, options = {}) => {
+      let token = await getValidToken();
+      if (!token) throw new Error('Authentication required');
+
+      const makeRequest = async (authToken) => {
+        return fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type':
+              options.headers?.['Content-Type'] || 'application/json',
+            Authorization: `Bearer ${authToken}`,
+            ...options.headers,
+          },
+          credentials: 'include',
+        });
+      };
+
+      let response = await makeRequest(token);
+
+      // If 401 and we haven't already refreshed, try once more
+      if (response.status === 401) {
+        console.log('🔄 Got 401, attempting token refresh...');
+        const newToken = await refreshAccessToken();
+
+        if (newToken) {
+          console.log('🔄 Retrying request with new token...');
+          response = await makeRequest(newToken);
+        } else {
+          throw new Error('Authentication failed');
+        }
+      }
+
+      return response;
+    },
+    [getValidToken, refreshAccessToken]
+  );
+
+  // Debug info (remove in production)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Auth State:', {
+        hasToken: !!accessToken,
+        hasUser: !!user,
+        tokenExpiry: tokenExpiry
+          ? new Date(tokenExpiry).toLocaleString()
+          : null,
+        isExpired: isTokenExpired(),
+        loading,
+      });
+    }
+  }, [accessToken, user, tokenExpiry, loading, isTokenExpired]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        loading,
+        isAuthenticated: !!user && !!accessToken && !isTokenExpired(),
+        login,
+        register,
+        logout,
+        getValidToken,
+        authenticatedFetch,
+        // Utility functions
+        isTokenExpired,
+        refreshAccessToken, // Expose for manual refresh if needed
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
-};
-
-// Enhanced authenticated fetch hook with automatic retry
-export const useAuthenticatedFetch = () => {
-  const { getValidToken, logout } = useAuth();
-
-  const authenticatedFetch = useCallback(
-    async (url, options = {}) => {
-      try {
-        // Get valid access token (automatically refreshes if needed)
-        const token = await getValidToken();
-
-        if (!token) {
-          console.error('❌ No valid access token available');
-          logout();
-          throw new Error('Authentication required');
-        }
-
-        // Make API call with access token
-        const response = await fetch(url, {
-          ...options,
-          headers: {
-            ...options.headers,
-            Authorization: `Bearer ${token}`,
-            'Content-Type':
-              options.headers?.['Content-Type'] || 'application/json',
-          },
-          credentials: 'include',
-        });
-
-        // If still unauthorized after getting fresh token, logout user
-        if (response.status === 401) {
-          console.error('❌ API call unauthorized even with fresh token');
-          logout();
-          throw new Error('Authentication failed');
-        }
-
-        return response;
-      } catch (error) {
-        console.error('❌ Authenticated fetch error:', error);
-        throw error;
-      }
-    },
-    [getValidToken, logout]
-  );
-
-  return { authenticatedFetch };
 };
