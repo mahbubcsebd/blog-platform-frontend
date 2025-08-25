@@ -5,7 +5,9 @@ import '@blocknote/core/fonts/inter.css';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
 import '@blocknote/shadcn/style.css';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+
+// Import syntax highlighter
 
 async function uploadFileToServer(file) {
   const fd = new FormData();
@@ -55,99 +57,175 @@ function enhanceHTMLWithStyles(html) {
   return `<div class="prose prose-lg max-w-none">${styledHTML}</div>`;
 }
 
+// Language detection function
+function detectLanguageFromCode(code) {
+  const patterns = {
+    javascript: [
+      /import\s+.*\s+from\s+['"].*['"];?/,
+      /const\s+\w+\s*=.*=>/,
+      /function\s+\w+\s*\(/,
+      /console\.log\s*\(/,
+      /\.then\s*\(/,
+      /require\s*\(['"].*['"]\)/,
+      /module\.exports/,
+      /export\s+(default\s+)?/,
+    ],
+    python: [
+      /import\s+\w+/,
+      /from\s+\w+\s+import/,
+      /def\s+\w+\s*\(/,
+      /print\s*\(/,
+      /if\s+__name__\s*==\s*['"]__main__['"]:/,
+      /class\s+\w+.*:/,
+    ],
+    html: [
+      /<\/?[a-zA-Z][\s\S]*?>/,
+      /<!DOCTYPE/i,
+      /<html/i,
+      /<head>/i,
+      /<body>/i,
+    ],
+    css: [
+      /[.#]?[a-zA-Z][\w-]*\s*\{[\s\S]*\}/,
+      /@media\s*\(/,
+      /@import\s+/,
+      /:\s*[\w-]+\s*;/,
+    ],
+    json: [/^\s*\{[\s\S]*\}\s*$/, /^\s*\[[\s\S]*\]\s*$/, /"[^"]*"\s*:\s*/],
+    bash: [/#!/, /\$\w+/, /echo\s+/, /cd\s+/, /ls\s*/, /chmod\s+/, /sudo\s+/],
+    sql: [
+      /SELECT\s+.*\s+FROM\s+/i,
+      /INSERT\s+INTO\s+/i,
+      /UPDATE\s+.*\s+SET\s+/i,
+      /DELETE\s+FROM\s+/i,
+      /CREATE\s+TABLE\s+/i,
+    ],
+  };
+
+  for (const [lang, regexes] of Object.entries(patterns)) {
+    for (const regex of regexes) {
+      if (regex.test(code)) {
+        return lang;
+      }
+    }
+  }
+
+  return 'text';
+}
+
+// Enhanced JSON processor to detect and set languages
+function enhanceJSONWithLanguages(blocks) {
+  if (!Array.isArray(blocks)) return blocks;
+
+  return blocks.map((block) => {
+    if (block.type === 'codeBlock') {
+      const codeContent = Array.isArray(block.content)
+        ? block.content.map((item) => item.text || '').join('')
+        : block.content?.text || '';
+
+      // Auto-detect language if not set or set to 'text'
+      let detectedLanguage = block.props?.language || 'text';
+      if (detectedLanguage === 'text' && codeContent.trim()) {
+        detectedLanguage = detectLanguageFromCode(codeContent);
+      }
+
+      return {
+        ...block,
+        props: {
+          ...block.props,
+          language: detectedLanguage,
+        },
+      };
+    }
+
+    // Recursively process children if they exist
+    if (block.children && Array.isArray(block.children)) {
+      return {
+        ...block,
+        children: enhanceJSONWithLanguages(block.children),
+      };
+    }
+
+    return block;
+  });
+}
+
+// Custom CSS for BlockNote editor with syntax highlighting
+const customEditorStyles = `
+  .bn-editor .bn-block-content[data-content-type="codeBlock"] {
+    position: relative;
+  }
+
+  .bn-editor .bn-block-content[data-content-type="codeBlock"] pre {
+    background: #1e1e1e !important;
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .bn-editor .bn-block-content[data-content-type="codeBlock"] code {
+    background: transparent !important;
+    padding: 0 !important;
+    color: #d4d4d4;
+  }
+
+  .syntax-highlighter-wrapper {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+`;
+
 const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
-  const [mounted, setMounted] = useState(false);
   const onChangeRef = useRef(onChange);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Handle mounting to prevent hydration issues
   useEffect(() => {
-    setMounted(true);
+    // Add custom CSS for syntax highlighting
+    const styleElement = document.createElement('style');
+    styleElement.textContent = customEditorStyles;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
   }, []);
 
-  // Create default empty paragraph block that BlockNote expects
-  const defaultContent = useMemo(
-    () => [
-      {
-        id: 'default-block',
-        type: 'paragraph',
-        props: {},
-        content: [],
-        children: [],
-      },
-    ],
-    []
-  );
+  // 🔹 Crash-safe parser
+  let parsedContent;
+  try {
+    parsedContent =
+      typeof initialContent === 'string' && initialContent.trim() !== ''
+        ? JSON.parse(initialContent)
+        : Array.isArray(initialContent)
+        ? initialContent
+        : typeof initialContent === 'object' && initialContent !== null
+        ? [initialContent]
+        : undefined;
+  } catch (err) {
+    console.warn('Invalid initialContent, using empty editor:', err);
+    parsedContent = undefined;
+  }
 
-  // Safely parse and normalize initial content - only after mount
-  const normalizedInitialContent = useMemo(() => {
-    if (!mounted) {
-      // Return consistent default for SSR
-      return defaultContent;
-    }
-
-    try {
-      // If initialContent is undefined or null, return default content
-      if (initialContent == null) return defaultContent;
-
-      // If it's already an array
-      if (Array.isArray(initialContent)) {
-        // If empty array, return default content
-        if (initialContent.length === 0) return defaultContent;
-
-        // Validate that each item has required BlockNote structure
-        const isValidBlockNoteContent = initialContent.every(
-          (block) => block && typeof block === 'object' && 'type' in block
-        );
-
-        return isValidBlockNoteContent ? initialContent : defaultContent;
-      }
-
-      // If it's a string, try to parse it
-      if (typeof initialContent === 'string' && initialContent.trim() !== '') {
-        const parsed = JSON.parse(initialContent);
-        if (Array.isArray(parsed)) {
-          return parsed.length > 0 ? parsed : defaultContent;
-        }
-        return defaultContent;
-      }
-
-      // If it's an object, check if it's a valid block
-      if (typeof initialContent === 'object' && initialContent !== null) {
-        if ('type' in initialContent) {
-          return [initialContent];
-        }
-        return defaultContent;
-      }
-
-      // Fallback to default content
-      return defaultContent;
-    } catch (err) {
-      console.warn('Invalid initialContent, using default content:', err);
-      return defaultContent;
-    }
-  }, [initialContent, mounted, defaultContent]);
-
-  // Only create editor after mount to prevent hydration issues
-  const editor = useMemo(() => {
-    if (!mounted) return null;
-
-    try {
-      return useCreateBlockNote({
-        initialContent: normalizedInitialContent,
-        uploadFile: uploadFileToServer,
-      });
-    } catch (error) {
-      console.error('Error creating BlockNote editor:', error);
-      return null;
-    }
-  }, [mounted, normalizedInitialContent]);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const editor = useCreateBlockNote({
+    initialContent: parsedContent,
+    uploadFile: uploadFileToServer,
+    // Add custom renderers for better syntax highlighting
+    blockSpecs: {
+      // You can add custom block specs here if needed
+    },
+  });
 
   useEffect(() => {
-    if (!editor || !mounted) return;
+    if (!editor) return;
 
     const onContentChange = async () => {
       try {
@@ -158,13 +236,16 @@ const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
         } else if (editor.document) {
           json = editor.document;
         } else {
-          json = normalizedInitialContent;
+          json = [];
         }
 
+        // 🔹 Enhance JSON with auto-detected languages
+        const enhancedJson = enhanceJSONWithLanguages(json);
+
         if (typeof editor.blocksToHTMLLossy === 'function') {
-          html = await editor.blocksToHTMLLossy(json);
+          html = await editor.blocksToHTMLLossy(enhancedJson);
         } else if (typeof editor.blocksToHTML === 'function') {
-          html = await editor.blocksToHTML(json);
+          html = await editor.blocksToHTML(enhancedJson);
         } else {
           html = '';
         }
@@ -172,7 +253,7 @@ const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
         styledHTML = enhanceHTMLWithStyles(html);
 
         const content = {
-          json,
+          json: enhancedJson, // Use enhanced JSON with proper languages
           html: styledHTML,
           rawHTML: html,
         };
@@ -183,11 +264,7 @@ const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
       } catch (error) {
         console.error('Error in editor onChange:', error);
         if (onChangeRef.current) {
-          onChangeRef.current({
-            json: normalizedInitialContent,
-            html: '',
-            rawHTML: '',
-          });
+          onChangeRef.current({ json: [], html: '', rawHTML: '' });
         }
       }
     };
@@ -206,29 +283,7 @@ const EditorShadcn = ({ onChange, initialContent = null, editable = true }) => {
         editor.off('contentChange', onContentChange);
       }
     };
-  }, [editor, normalizedInitialContent, mounted]);
-
-  // Show loading state while not mounted
-  if (!mounted) {
-    return (
-      <div className="-mx-[54px] my-4">
-        <div className="h-[400px] bg-slate-50 rounded-lg animate-pulse flex items-center justify-center">
-          <div className="text-slate-400">Loading editor...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading state if editor is not ready
-  if (!editor) {
-    return (
-      <div className="-mx-[54px] my-4">
-        <div className="h-[400px] bg-slate-50 rounded-lg animate-pulse flex items-center justify-center">
-          <div className="text-slate-400">Initializing editor...</div>
-        </div>
-      </div>
-    );
-  }
+  }, [editor]);
 
   return (
     <div className="-mx-[54px] my-4">

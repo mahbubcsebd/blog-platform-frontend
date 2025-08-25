@@ -33,6 +33,8 @@ const Header = () => {
   const { user, logout, loading, isAuthenticated } = useAuth();
   const pathname = usePathname();
 
+  console.log(user);
+
   // Get user initials for avatar fallback
   const getUserInitials = (user) => {
     if (!user) return 'U';

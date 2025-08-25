@@ -1,9 +1,28 @@
 import { Check, Copy } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-const CodeBlock = ({ textContent, language = 'text' }) => {
+const CodeBlock = ({ textContent, language = 'text', onLanguageChange }) => {
   const [copied, setCopied] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const copyToClipboard = async () => {
     try {
@@ -15,6 +34,148 @@ const CodeBlock = ({ textContent, language = 'text' }) => {
     }
   };
 
+  // Available languages for the dropdown
+  const availableLanguages = [
+    { value: 'text', label: 'Plain Text' },
+    { value: 'javascript', label: 'JavaScript' },
+    { value: 'typescript', label: 'TypeScript' },
+    { value: 'python', label: 'Python' },
+    { value: 'java', label: 'Java' },
+    { value: 'c', label: 'C' },
+    { value: 'cpp', label: 'C++' },
+    { value: 'csharp', label: 'C#' },
+    { value: 'php', label: 'PHP' },
+    { value: 'ruby', label: 'Ruby' },
+    { value: 'go', label: 'Go' },
+    { value: 'rust', label: 'Rust' },
+    { value: 'swift', label: 'Swift' },
+    { value: 'kotlin', label: 'Kotlin' },
+    { value: 'dart', label: 'Dart' },
+    { value: 'html', label: 'HTML' },
+    { value: 'css', label: 'CSS' },
+    { value: 'scss', label: 'SCSS' },
+    { value: 'json', label: 'JSON' },
+    { value: 'xml', label: 'XML' },
+    { value: 'yaml', label: 'YAML' },
+    { value: 'markdown', label: 'Markdown' },
+    { value: 'bash', label: 'Bash' },
+    { value: 'powershell', label: 'PowerShell' },
+    { value: 'sql', label: 'SQL' },
+    { value: 'r', label: 'R' },
+    { value: 'matlab', label: 'MATLAB' },
+  ];
+
+  const handleLanguageChange = (newLanguage) => {
+    setSelectedLanguage(newLanguage);
+    setIsDropdownOpen(false);
+    if (onLanguageChange) {
+      onLanguageChange(newLanguage);
+    }
+  };
+
+  // Auto-detect language from code content if language is 'text'
+  const detectLanguage = (code, providedLang) => {
+    if (providedLang && providedLang !== 'text' && providedLang !== 'txt') {
+      return providedLang;
+    }
+
+    const patterns = {
+      javascript: [
+        /import\s+.*\s+from\s+['"].*['"];?/,
+        /const\s+\w+\s*=.*=>/,
+        /function\s+\w+\s*\(/,
+        /console\.log\s*\(/,
+        /\.then\s*\(/,
+        /require\s*\(['"].*['"]\)/,
+        /module\.exports/,
+        /export\s+(default\s+)?/,
+      ],
+      python: [
+        /import\s+\w+/,
+        /from\s+\w+\s+import/,
+        /def\s+\w+\s*\(/,
+        /print\s*\(/,
+        /if\s+__name__\s*==\s*['"]__main__['"]:/,
+        /class\s+\w+.*:/,
+      ],
+      html: [
+        /<\/?[a-zA-Z][\s\S]*?>/,
+        /<!DOCTYPE/i,
+        /<html/i,
+        /<head>/i,
+        /<body>/i,
+      ],
+      css: [
+        /[.#]?[a-zA-Z][\w-]*\s*\{[\s\S]*\}/,
+        /@media\s*\(/,
+        /@import\s+/,
+        /:\s*[\w-]+\s*;/,
+      ],
+      json: [/^\s*\{[\s\S]*\}\s*$/, /^\s*\[[\s\S]*\]\s*$/, /"[^"]*"\s*:\s*/],
+      bash: [/#!/, /\$\w+/, /echo\s+/, /cd\s+/, /ls\s*/, /chmod\s+/, /sudo\s+/],
+      sql: [
+        /SELECT\s+.*\s+FROM\s+/i,
+        /INSERT\s+INTO\s+/i,
+        /UPDATE\s+.*\s+SET\s+/i,
+        /DELETE\s+FROM\s+/i,
+        /CREATE\s+TABLE\s+/i,
+      ],
+    };
+
+    for (const [lang, regexes] of Object.entries(patterns)) {
+      for (const regex of regexes) {
+        if (regex.test(code)) {
+          return lang;
+        }
+      }
+    }
+
+    return 'text';
+  };
+
+  const getLanguage = (lang, code) => {
+    const detectedLang = detectLanguage(code, lang);
+
+    const languageMap = {
+      js: 'javascript',
+      jsx: 'javascript',
+      ts: 'typescript',
+      tsx: 'typescript',
+      py: 'python',
+      rb: 'ruby',
+      sh: 'bash',
+      bash: 'bash',
+      yml: 'yaml',
+      yaml: 'yaml',
+      md: 'markdown',
+      html: 'html',
+      css: 'css',
+      json: 'json',
+      xml: 'xml',
+      sql: 'sql',
+      php: 'php',
+      java: 'java',
+      c: 'c',
+      cpp: 'cpp',
+      go: 'go',
+      rust: 'rust',
+    };
+
+    return languageMap[detectedLang] || detectedLang;
+  };
+
+  const displayLanguage = getLanguage(selectedLanguage, textContent);
+  const shouldUseHighlighter = displayLanguage !== 'text';
+
+  const currentLanguageLabel =
+    availableLanguages.find((lang) => lang.value === displayLanguage)?.label ||
+    'Plain Text';
+
+  // Debug logging
+  console.log('Language received:', language);
+  console.log('Display language:', displayLanguage);
+  console.log('Should use highlighter:', shouldUseHighlighter);
+
   return (
     <div className="relative mb-6 rounded-lg overflow-hidden shadow-lg bg-gray-900">
       {/* Terminal Header */}
@@ -24,9 +185,53 @@ const CodeBlock = ({ textContent, language = 'text' }) => {
           <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
         </div>
-        <div className="text-gray-400 text-sm font-medium">
-          {language !== 'text' ? language : 'Terminal'}
+
+        {/* Language Selector Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center space-x-2 text-gray-400 text-sm font-medium hover:text-gray-200 transition-colors duration-200 px-3 py-1 rounded-md hover:bg-gray-700"
+          >
+            <span>{currentLanguageLabel}</span>
+            <svg
+              className={`w-4 h-4 transform transition-transform duration-200 ${
+                isDropdownOpen ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-600 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
+              <div className="py-2">
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang.value}
+                    onClick={() => handleLanguageChange(lang.value)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 transition-colors duration-200 ${
+                      displayLanguage === lang.value
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-300'
+                    }`}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
         <button
           onClick={copyToClipboard}
           className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
@@ -40,11 +245,35 @@ const CodeBlock = ({ textContent, language = 'text' }) => {
         </button>
       </div>
 
-      {/* Code Content */}
-      <div className="p-4 bg-gray-900 overflow-x-auto">
-        <pre className="text-sm text-gray-100 font-mono leading-relaxed">
-          <code>{textContent}</code>
-        </pre>
+      {/* Code Content with Syntax Highlighting */}
+      <div className="bg-gray-900 overflow-x-auto">
+        {!shouldUseHighlighter ? (
+          // Plain text fallback
+          <pre className="p-4 text-sm text-gray-100 font-mono leading-relaxed">
+            <code>{textContent}</code>
+          </pre>
+        ) : (
+          // Always try syntax highlighting for programming languages
+          <div className="relative">
+            <SyntaxHighlighter
+              language={displayLanguage}
+              style={vscDarkPlus}
+              customStyle={{
+                margin: 0,
+                padding: '16px',
+                background: 'transparent',
+                fontSize: '14px',
+                lineHeight: '1.5',
+                fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, monospace',
+              }}
+              showLineNumbers={false}
+              wrapLines={true}
+              wrapLongLines={true}
+            >
+              {textContent}
+            </SyntaxHighlighter>
+          </div>
+        )}
       </div>
     </div>
   );

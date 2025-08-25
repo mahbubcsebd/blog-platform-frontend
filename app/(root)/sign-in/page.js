@@ -62,6 +62,8 @@ function SignInForm() {
 
       const result = await login(username, password);
 
+      console.log(result);
+
       if (result.success) {
         setSuccess(true);
         setTimeout(() => {

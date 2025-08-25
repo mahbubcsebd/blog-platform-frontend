@@ -235,6 +235,8 @@ const AdminDashboardPage = () => {
                       <Image
                         src={`https://ui-avatars.com/api/?name=${user.name}&background=random`}
                         alt={user.name}
+                        width={100}
+                        height={100}
                         className="w-10 h-10 rounded-full"
                       />
                       <div>

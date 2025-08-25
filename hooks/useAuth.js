@@ -26,6 +26,8 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(token);
     setUser(userData);
 
+    console.log('this is set user', userData);
+
     // Calculate expiry time (subtract 1 minute for safety margin)
     if (expiresIn || token) {
       const expiryTime =
@@ -67,6 +69,7 @@ export const AuthProvider = ({ children }) => {
 
       if (res.ok && data.success) {
         const { accessToken: newToken, user: userData, expiresIn } = data.data;
+        console.log(userData, data.data);
         setAuthData({
           token: newToken,
           userData,

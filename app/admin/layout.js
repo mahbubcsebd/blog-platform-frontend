@@ -137,6 +137,8 @@ const AdminLayout = ({ children }) => {
                 <Image
                   src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face"
                   alt="Admin"
+                  width={400}
+                  height={400}
                   className="w-10 h-10 rounded-full border-2 border-blue-500"
                 />
                 <div className="hidden md:block">
