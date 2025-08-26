@@ -33,16 +33,20 @@ function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
 
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
   const wasRedirected = searchParams.has('redirect');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      router.replace(redirectUrl);
+    if (isAuthenticated && user) {
+      if (user.role === 'ADMIN') {
+        router.replace('/admin');
+      } else {
+        router.replace(redirectUrl); // immediate redirect
+      }
     }
-  }, [isAuthenticated, router, redirectUrl]);
+  }, [isAuthenticated, user, router, redirectUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,9 +70,6 @@ function SignInForm() {
 
       if (result.success) {
         setSuccess(true);
-        setTimeout(() => {
-          router.replace(redirectUrl);
-        }, 1000);
       } else {
         setError(result.error);
       }

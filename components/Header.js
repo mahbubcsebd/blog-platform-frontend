@@ -70,7 +70,7 @@ const Header = () => {
   // Dashboard navigation items (for authenticated users)
   const dashboardNavItems = [
     {
-      href: '/dashboard/create',
+      href: '/dashboard/posts/new',
       label: 'Write Story',
       icon: Plus,
     },

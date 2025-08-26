@@ -50,11 +50,14 @@ export async function updatePost(id, formData, accessToken) {
 }
 
 // delete post by id
-export async function deletePost(id) {
+export async function deletePost(id, accessToken) {
   try {
     const res = await fetch(`${baseUrl}/posts/${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`, // ✅ Add auth token
+      },
     });
 
     if (!res.ok) {
@@ -172,6 +175,207 @@ export async function getPostBySlug(slug, includeContent = true) {
     };
   }
 }
+
+/**
+ * ========================================
+ * AUTO-PUBLISHING FUNCTIONS
+ * ========================================
+ */
+
+/**
+ * Get scheduled posts
+ */
+export async function getScheduledPosts(accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/scheduled`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching scheduled posts:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch scheduled posts',
+      data: [],
+    };
+  }
+}
+
+/**
+ * Trigger auto-publish manually
+ */
+export async function triggerAutoPublish(accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/auto-publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error triggering auto-publish:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to trigger auto-publish',
+      data: [],
+    };
+  }
+}
+
+/**
+ * Publish post immediately
+ */
+export async function publishPost(id, accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/${id}/publish`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to publish post: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error publishing post:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Unpublish post (move to draft)
+ */
+export async function unpublishPost(id, accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/${id}/unpublish`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to unpublish post: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error unpublishing post:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Schedule post for future publishing
+ */
+export async function schedulePost(id, scheduledDate, accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/${id}/schedule`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        scheduledDate: scheduledDate,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to schedule post: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error scheduling post:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Duplicate post
+ */
+export async function duplicatePost(id, accessToken) {
+  try {
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/posts/${id}/duplicate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to duplicate post: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error duplicating post:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ========================================
+ * EXISTING FUNCTIONS (UNCHANGED)
+ * ========================================
+ */
 
 /**
  * Fetch topics with post counts

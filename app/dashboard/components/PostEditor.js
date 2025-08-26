@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import PublishModal from './PublishModal';
 
@@ -71,8 +71,8 @@ export default function PostEditor({
     };
   }, [initialData]);
 
-  // Safe parsing for editor content
-  const getInitialEditorContent = () => {
+  // Safe parsing for editor content with better error handling and proper BlockNote format
+  const getInitialEditorContent = useCallback(() => {
     if (
       transformedInitialData?.content &&
       transformedInitialData?.contentType === 'EDITOR'
@@ -89,36 +89,34 @@ export default function PostEditor({
         console.warn('Failed to parse initial editor content:', error);
       }
     }
-    // Return default content that BlockNote expects
+    // Return proper BlockNote default content structure
     return {
       json: [
         {
-          id: 'initial-block',
+          id: crypto.randomUUID ? crypto.randomUUID() : `block-${Date.now()}`,
           type: 'paragraph',
-          props: {},
+          props: {
+            textColor: 'default',
+            backgroundColor: 'default',
+            textAlignment: 'left',
+          },
           content: [],
           children: [],
         },
       ],
-      html: '',
+      html: '<p></p>',
     };
-  };
+  }, [transformedInitialData]);
 
-  // State management
-  const [title, setTitle] = useState(transformedInitialData?.title || '');
-  const [contentType, setContentType] = useState(
-    transformedInitialData?.contentType || 'EDITOR'
+  // State management with better initial values
+  const [title, setTitle] = useState('');
+  const [contentType, setContentType] = useState('EDITOR');
+  const [editorContent, setEditorContent] = useState(() =>
+    getInitialEditorContent()
   );
-  const [editorContent, setEditorContent] = useState(getInitialEditorContent);
-  const [markdownContent, setMarkdownContent] = useState(
-    transformedInitialData?.contentType === 'MARKDOWN'
-      ? transformedInitialData?.content || ''
-      : ''
-  );
+  const [markdownContent, setMarkdownContent] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
-  const [previewImagePreview, setPreviewImagePreview] = useState(
-    transformedInitialData?.previewImage || null
-  );
+  const [previewImagePreview, setPreviewImagePreview] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -126,12 +124,13 @@ export default function PostEditor({
   const [error, setError] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [editorKey, setEditorKey] = useState(0); // Add editor key for force re-render
 
-  // Re-initialize when initialData changes (for edit mode)
+  // Initialize form data when initialData changes
   useEffect(() => {
     if (transformedInitialData) {
       setTitle(transformedInitialData.title || '');
-      setContentType(transformedInitialData.contentType || 'MARKDOWN');
+      setContentType(transformedInitialData.contentType || 'EDITOR');
       setMarkdownContent(
         transformedInitialData.contentType === 'MARKDOWN'
           ? transformedInitialData.content || ''
@@ -141,32 +140,76 @@ export default function PostEditor({
 
       if (transformedInitialData.contentType === 'EDITOR') {
         try {
-          const parsedContent = JSON.parse(transformedInitialData.content);
+          const parsedContent = JSON.parse(
+            transformedInitialData.content || '[]'
+          );
           if (Array.isArray(parsedContent) && parsedContent.length > 0) {
+            // Ensure proper BlockNote structure
+            const validatedContent = parsedContent.map((block) => ({
+              id:
+                block.id ||
+                (crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : `block-${Date.now()}-${Math.random()}`),
+              type: block.type || 'paragraph',
+              props: block.props || {
+                textColor: 'default',
+                backgroundColor: 'default',
+                textAlignment: 'left',
+              },
+              content: Array.isArray(block.content) ? block.content : [],
+              children: Array.isArray(block.children) ? block.children : [],
+            }));
+
             setEditorContent({
-              json: parsedContent,
+              json: validatedContent,
               html: transformedInitialData.htmlContent || '',
             });
           }
         } catch (error) {
           console.warn('Failed to parse editor content on data change:', error);
+          setEditorContent(getInitialEditorContent());
         }
       }
+      // Force re-render of editor when data changes
+      setEditorKey((prev) => prev + 1);
     }
-  }, [transformedInitialData]);
+  }, [transformedInitialData, getInitialEditorContent]);
 
-  // Track changes for unsaved indicator
+  // Track changes for unsaved indicator with better comparison
   useEffect(() => {
-    const initialTitle = transformedInitialData?.title || '';
+    if (!transformedInitialData) {
+      // For new posts, check if any field has content
+      const hasEditorContent =
+        editorContent.json &&
+        editorContent.json.length > 0 &&
+        editorContent.json.some(
+          (block) =>
+            block.content &&
+            Array.isArray(block.content) &&
+            block.content.length > 0 &&
+            block.content.some((item) => item.text && item.text.trim() !== '')
+        );
+
+      const hasChanges =
+        title.trim() !== '' ||
+        markdownContent.trim() !== '' ||
+        hasEditorContent;
+
+      setHasUnsavedChanges(hasChanges);
+      return;
+    }
+
+    const initialTitle = transformedInitialData.title || '';
     const initialMarkdown =
-      transformedInitialData?.contentType === 'MARKDOWN'
-        ? transformedInitialData?.content || ''
+      transformedInitialData.contentType === 'MARKDOWN'
+        ? transformedInitialData.content || ''
         : '';
 
     let initialEditor = [];
     if (
-      transformedInitialData?.content &&
-      transformedInitialData?.contentType === 'EDITOR'
+      transformedInitialData.content &&
+      transformedInitialData.contentType === 'EDITOR'
     ) {
       try {
         initialEditor = JSON.parse(transformedInitialData.content);
@@ -186,79 +229,157 @@ export default function PostEditor({
     setHasUnsavedChanges(hasChanges);
   }, [title, markdownContent, editorContent, transformedInitialData]);
 
-  const handleEditorChange = (content) => {
-    setEditorContent(content || { json: [], html: '' });
-  };
+  // Clear messages after a timeout
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
-  const resetForm = () => {
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  // Enhanced editor change handler with validation
+  const handleEditorChange = useCallback((content) => {
+    console.log('Editor content changed:', content); // Debug log
+
+    // Validate content structure
+    if (content && typeof content === 'object') {
+      const validatedContent = {
+        json: Array.isArray(content.json) ? content.json : [],
+        html: typeof content.html === 'string' ? content.html : '',
+      };
+      setEditorContent(validatedContent);
+    } else {
+      // Fallback to default structure
+      setEditorContent({
+        json: [
+          {
+            id: crypto.randomUUID
+              ? crypto.randomUUID()
+              : `fallback-${Date.now()}`,
+            type: 'paragraph',
+            props: {
+              textColor: 'default',
+              backgroundColor: 'default',
+              textAlignment: 'left',
+            },
+            content: [],
+            children: [],
+          },
+        ],
+        html: '<p></p>',
+      });
+    }
+  }, []);
+
+  const resetForm = useCallback(() => {
     if (!isEditMode) {
       setTitle('');
       setEditorContent({
         json: [
           {
-            id: 'reset-block',
+            id: crypto.randomUUID ? crypto.randomUUID() : `reset-${Date.now()}`,
             type: 'paragraph',
-            props: {},
+            props: {
+              textColor: 'default',
+              backgroundColor: 'default',
+              textAlignment: 'left',
+            },
             content: [],
             children: [],
           },
         ],
-        html: '',
+        html: '<p></p>',
       });
       setMarkdownContent('');
     }
     setPreviewImage(null);
     setPreviewImagePreview(transformedInitialData?.previewImage || null);
     setShowPublishModal(false);
-  };
+    setEditorKey((prev) => prev + 1); // Force re-render
+  }, [isEditMode, transformedInitialData]);
 
-  const validateForm = () => {
-    if (!title.trim()) throw new Error('Title is required');
-
-    const hasContent =
-      contentType === 'EDITOR'
-        ? Array.isArray(editorContent.json) && editorContent.json.length > 0
-        : markdownContent.trim();
-
-    if (!hasContent) throw new Error('Content is required');
-  };
-
-  const createFormData = (publishData) => {
-    const formData = new FormData();
-    formData.set('title', title.trim());
-    formData.set('excerpt', publishData.excerpt || '');
-    formData.set('contentType', contentType);
-
-    if (Array.isArray(publishData.tags) && publishData.tags.length > 0) {
-      formData.set(
-        'tags',
-        JSON.stringify(publishData.tags.map((tag) => tag.value || tag))
-      );
+  const validateForm = useCallback(() => {
+    if (!title.trim()) {
+      throw new Error('Title is required');
     }
 
-    if (publishData.isScheduling) {
-      formData.set('status', 'SCHEDULED');
-      formData.set('publishDate', publishData.publishDate.toISOString());
-    } else {
-      formData.set('status', 'PUBLISHED');
-    }
+    let hasContent = false;
 
     if (contentType === 'EDITOR') {
-      const jsonContent = Array.isArray(editorContent.json)
-        ? editorContent.json
-        : [];
-      formData.set('content', JSON.stringify(jsonContent));
-      if (editorContent.html) formData.set('htmlContent', editorContent.html);
-    } else if (contentType === 'MARKDOWN') {
-      formData.set('content', markdownContent);
+      hasContent =
+        editorContent.json &&
+        Array.isArray(editorContent.json) &&
+        editorContent.json.length > 0 &&
+        editorContent.json.some(
+          (block) =>
+            block.content &&
+            Array.isArray(block.content) &&
+            block.content.length > 0 &&
+            block.content.some((item) => item.text && item.text.trim() !== '')
+        );
+    } else {
+      hasContent = markdownContent.trim().length > 0;
     }
 
-    if (previewImage) formData.append('previewImage', previewImage);
-    if (isEditMode && transformedInitialData?.id)
-      formData.set('id', transformedInitialData.id);
+    if (!hasContent) {
+      throw new Error('Content is required');
+    }
+  }, [title, contentType, editorContent.json, markdownContent]);
 
-    return formData;
-  };
+  const createFormData = useCallback(
+    (publishData) => {
+      const formData = new FormData();
+      formData.set('title', title.trim());
+      formData.set('excerpt', publishData.excerpt || '');
+      formData.set('contentType', contentType);
+
+      if (Array.isArray(publishData.tags) && publishData.tags.length > 0) {
+        formData.set(
+          'tags',
+          JSON.stringify(publishData.tags.map((tag) => tag.value || tag))
+        );
+      }
+
+      if (publishData.isScheduling) {
+        formData.set('status', 'SCHEDULED');
+        formData.set('publishDate', publishData.publishDate.toISOString());
+      } else {
+        formData.set('status', 'PUBLISHED');
+      }
+
+      if (contentType === 'EDITOR') {
+        const jsonContent = Array.isArray(editorContent.json)
+          ? editorContent.json
+          : [];
+        formData.set('content', JSON.stringify(jsonContent));
+        if (editorContent.html) formData.set('htmlContent', editorContent.html);
+      } else if (contentType === 'MARKDOWN') {
+        formData.set('content', markdownContent);
+      }
+
+      if (previewImage) formData.append('previewImage', previewImage);
+      if (isEditMode && transformedInitialData?.id)
+        formData.set('id', transformedInitialData.id);
+
+      return formData;
+    },
+    [
+      title,
+      contentType,
+      editorContent,
+      markdownContent,
+      previewImage,
+      isEditMode,
+      transformedInitialData,
+    ]
+  );
 
   const handleSubmit = async (publishData) => {
     const token = await getValidToken();
@@ -276,16 +397,17 @@ export default function PostEditor({
         : await createPostAction(formData, token);
 
       if (result.success) {
-        console.log(result);
         setMessage(result.message);
         setHasUnsavedChanges(false);
-        router.push(`/posts/${result.data.slug}`);
-        resetForm();
 
-        // Navigate to posts list instead of specific post slug
-        // setTimeout(() => {
-        //   router.push('/dashboard/posts');
-        // }, 1000);
+        // Navigate based on post status
+        if (result.data.status === 'PUBLISHED') {
+          router.push(`/posts/${result.data.slug}`);
+        } else {
+          router.push('/dashboard/posts');
+        }
+
+        resetForm();
       } else {
         setError(result.error || 'Something went wrong.');
       }
@@ -325,28 +447,28 @@ export default function PostEditor({
       if (result.success) {
         setMessage('Draft saved successfully!');
         setHasUnsavedChanges(false);
-        setTimeout(() => setMessage(null), 3000);
       } else {
         setError(result.error || 'Failed to save draft');
       }
     } catch (err) {
+      console.error('Save draft error:', err);
       setError('Failed to save draft');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSetPreviewImage = (file) => {
+  const handleSetPreviewImage = useCallback((file) => {
     setPreviewImage(file);
     setPreviewImagePreview(file ? URL.createObjectURL(file) : null);
-  };
+  }, []);
 
-  const clearPreviewImage = () => {
+  const clearPreviewImage = useCallback(() => {
     setPreviewImage(null);
     setPreviewImagePreview(transformedInitialData?.previewImage || null);
-  };
+  }, [transformedInitialData]);
 
-  const handleGoBack = () => {
+  const handleGoBack = useCallback(() => {
     if (hasUnsavedChanges) {
       if (
         typeof window !== 'undefined' &&
@@ -359,7 +481,64 @@ export default function PostEditor({
     } else {
       router.back();
     }
-  };
+  }, [hasUnsavedChanges, router]);
+
+  // Handle content type switching with proper cleanup
+  const handleContentTypeChange = useCallback(
+    (newType) => {
+      if (newType === contentType) return;
+
+      const hasExistingContent =
+        (contentType === 'EDITOR' &&
+          editorContent.json.length > 0 &&
+          editorContent.json.some(
+            (block) =>
+              block.content &&
+              Array.isArray(block.content) &&
+              block.content.length > 0 &&
+              block.content.some((item) => item.text && item.text.trim() !== '')
+          )) ||
+        (contentType === 'MARKDOWN' && markdownContent.trim());
+
+      if (hasExistingContent) {
+        if (
+          !window.confirm(
+            'Switching content type will clear your current content. Continue?'
+          )
+        ) {
+          return;
+        }
+      }
+
+      setContentType(newType);
+
+      // Reset content for the new type
+      if (newType === 'EDITOR') {
+        setEditorContent({
+          json: [
+            {
+              id: crypto.randomUUID
+                ? crypto.randomUUID()
+                : `switch-${Date.now()}`,
+              type: 'paragraph',
+              props: {
+                textColor: 'default',
+                backgroundColor: 'default',
+                textAlignment: 'left',
+              },
+              content: [],
+              children: [],
+            },
+          ],
+          html: '<p></p>',
+        });
+        setEditorKey((prev) => prev + 1); // Force re-render
+      } else {
+        setMarkdownContent('');
+      }
+    },
+    [contentType, editorContent.json, markdownContent]
+  );
 
   // Show loading spinner for authentication
   if (authLoading || (isLoading && isAuthenticated)) {
@@ -413,7 +592,7 @@ export default function PostEditor({
                   <Button
                     variant={contentType === 'EDITOR' ? 'default' : 'ghost'}
                     size="sm"
-                    onClick={() => setContentType('EDITOR')}
+                    onClick={() => handleContentTypeChange('EDITOR')}
                     className="rounded-lg font-medium"
                   >
                     Rich Text
@@ -421,7 +600,7 @@ export default function PostEditor({
                   <Button
                     variant={contentType === 'MARKDOWN' ? 'default' : 'ghost'}
                     size="sm"
-                    onClick={() => setContentType('MARKDOWN')}
+                    onClick={() => handleContentTypeChange('MARKDOWN')}
                     className="rounded-lg font-medium"
                   >
                     Markdown
@@ -505,23 +684,21 @@ export default function PostEditor({
 
         <div className="space-y-10">
           {/* Enhanced Title Input */}
-          <div className="">
-            <div className="">
-              <TextareaAutosize
-                name="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={
-                  isEditMode ? 'Update your story title...' : 'Story title'
-                }
-                className="w-full text-4xl md:text-5xl lg:text-6xl font-bold border-none outline-none resize-none bg-transparent focus:ring-0 text-slate-900 placeholder-slate-400 leading-tight"
-                required
-              />
-            </div>
+          <div>
+            <TextareaAutosize
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={
+                isEditMode ? 'Update your story title...' : 'Story title'
+              }
+              className="w-full text-4xl md:text-5xl lg:text-6xl font-bold border-none outline-none resize-none bg-transparent focus:ring-0 text-slate-900 placeholder-slate-400 leading-tight"
+              required
+            />
           </div>
 
           {/* Enhanced Content Editor */}
-          <div className="">
+          <div>
             {contentType === 'MARKDOWN' ? (
               <div
                 className={`${
@@ -578,11 +755,11 @@ export default function PostEditor({
               </div>
             ) : (
               <div>
-                <div className="min-h-[500px]">
+                <div className="min-h-[500px] border border-slate-200 rounded-xl bg-white shadow-sm">
                   <EditorShadcn
                     onChange={handleEditorChange}
                     editable={true}
-                    key={message ? 'reset' : 'editor'}
+                    key={`editor-${contentType}-${editorKey}`} // Force re-render with key
                     initialContent={editorContent.json}
                   />
                 </div>

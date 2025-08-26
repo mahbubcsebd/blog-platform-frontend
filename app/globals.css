@@ -1,6 +1,7 @@
 @import 'tw-animate-css';
 @import 'highlight.js/styles/github-dark.css';
 @import 'tailwindcss';
+/* globals.css */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -23,6 +24,9 @@
 }
 
 @theme inline {
+  --font-body: 'Inter', sans-serif;
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-code: 'JetBrains Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -129,6 +133,20 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+pre,
+code {
+  font-family: var(--font-code) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading) !important;
 }
 
 @layer base {
@@ -281,4 +299,11 @@
 
 .publish-modal-content {
   max-width: 900px;
+}
+
+code.hljs {
+  .hljs {
+    color: #c9d1d9;
+    background: #0d1117 !important;
+  }
 }
