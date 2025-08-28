@@ -9,26 +9,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import DateTimePicker from './DateTimePicker';
+import EnhancedTagInput from './EnhancedTagInput';
 import ImageUpload from './ImageUpload';
-import MultiSelect from './MultiSelect';
-
-// Constants
-const MOCK_TAGS = [
-  { value: 'react', label: 'React' },
-  { value: 'nextjs', label: 'Next.js' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'javascript', label: 'JavaScript' },
-  { value: 'nodejs', label: 'Node.js' },
-  { value: 'web-development', label: 'Web Development' },
-  { value: 'frontend', label: 'Frontend' },
-  { value: 'backend', label: 'Backend' },
-  { value: 'tutorial', label: 'Tutorial' },
-  { value: 'programming', label: 'Programming' },
-];
 
 const PublishModal = ({
   open,
@@ -43,26 +36,50 @@ const PublishModal = ({
   isEditMode = false,
   initialData = null,
 }) => {
-  // Critical: Use consistent initial states to prevent hydration mismatch
+  // State management
   const [mounted, setMounted] = useState(false);
   const [tags, setTags] = useState([]);
   const [excerpt, setExcerpt] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
   const [publishDate, setPublishDate] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState('');
+  const [topics, setTopics] = useState([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+
+  // Fetch topics from API
+  const fetchTopics = async () => {
+    setLoadingTopics(true);
+    try {
+      const response = await fetch('/api/topics', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTopics(data.data || []);
+      } else {
+        console.error('Failed to fetch topics');
+      }
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
 
   // Handle mounting to prevent hydration issues
   useEffect(() => {
     setMounted(true);
+    fetchTopics();
 
     // Initialize states after mounting
     if (initialData) {
-      setTags(
-        initialData.tags
-          ? initialData.tags.map((tag) => ({ value: tag, label: tag }))
-          : []
-      );
+      setTags(initialData.tags || []);
       setExcerpt(initialData.excerpt || '');
       setIsScheduling(initialData.status === 'SCHEDULED' || false);
+      setSelectedTopic(initialData.topicId || '');
 
       // Handle date only after mounting to prevent SSR mismatch
       if (initialData.publishDate) {
@@ -75,6 +92,7 @@ const PublishModal = ({
       setTags([]);
       setExcerpt('');
       setIsScheduling(false);
+      setSelectedTopic('');
       setPublishDate(new Date());
     }
   }, [initialData, isEditMode]);
@@ -88,6 +106,7 @@ const PublishModal = ({
       tags,
       excerpt,
       previewImage,
+      topicId: selectedTopic,
     });
   };
 
@@ -100,6 +119,7 @@ const PublishModal = ({
         setTags([]);
         setExcerpt('');
         setIsScheduling(false);
+        setSelectedTopic('');
         setPublishDate(new Date());
         if (clearPreviewImage) clearPreviewImage();
       }, 300);
@@ -146,6 +166,46 @@ const PublishModal = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
             {/* Left Column */}
             <div className="space-y-6">
+              {/* Topic Selection */}
+              <div className="group">
+                <Label className="text-sm font-semibold text-gray-700 mb-4 block">
+                  Story Category
+                </Label>
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 focus-within:border-blue-400 transition-colors">
+                  <Select
+                    value={selectedTopic}
+                    onValueChange={setSelectedTopic}
+                  >
+                    <SelectTrigger className="border-0 p-0 h-auto text-base">
+                      <SelectValue
+                        placeholder={
+                          loadingTopics
+                            ? 'Loading categories...'
+                            : 'Select a category for your story'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {topics.map((topic) => (
+                        <SelectItem key={topic.id} value={topic.id}>
+                          <div className="flex items-center space-x-2">
+                            <span>{topic.name}</span>
+                            {topic.parent && (
+                              <span className="text-xs text-gray-500">
+                                in {topic.parent.name}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500 mt-3">
+                    Choose the most relevant category for better discoverability
+                  </p>
+                </div>
+              </div>
+
               {/* Preview Image Upload */}
               <div className="group">
                 <Label className="text-sm font-semibold text-gray-700 mb-4 block">
@@ -170,13 +230,14 @@ const PublishModal = ({
                   Tags
                 </Label>
                 <div className="bg-white border-2 border-gray-200 rounded-xl p-4 focus-within:border-blue-400 transition-colors">
-                  <MultiSelect
-                    options={MOCK_TAGS}
-                    selected={tags}
+                  <EnhancedTagInput
+                    tags={tags}
                     onChange={setTags}
+                    placeholder="Add tags to help readers find your story..."
+                    maxTags={10}
                   />
                   <p className="text-sm text-gray-500 mt-3">
-                    Help readers discover your story with relevant tags
+                    Add up to 10 tags. Press Enter or comma to create a new tag
                   </p>
                 </div>
               </div>
@@ -196,6 +257,7 @@ const PublishModal = ({
                     placeholder="Write a compelling description that will hook your readers..."
                     rows={6}
                     className="border-0 resize-none focus:ring-0 p-0 text-base"
+                    maxLength={500}
                   />
                   <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
                     <p className="text-sm text-gray-500">
@@ -204,10 +266,14 @@ const PublishModal = ({
                     <span
                       className={cn(
                         'text-sm font-medium',
-                        excerpt.length > 160 ? 'text-red-500' : 'text-gray-400'
+                        excerpt.length > 160
+                          ? 'text-red-500'
+                          : excerpt.length > 120
+                          ? 'text-yellow-500'
+                          : 'text-gray-400'
                       )}
                     >
-                      {excerpt.length}/160
+                      {excerpt.length}/500
                     </span>
                   </div>
                 </div>
@@ -250,7 +316,13 @@ const PublishModal = ({
                       <DateTimePicker
                         date={publishDate}
                         setDate={setPublishDate}
+                        minDate={new Date()}
                       />
+                      {publishDate && publishDate <= new Date() && (
+                        <p className="text-sm text-red-500 mt-2">
+                          Please select a future date and time
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -264,8 +336,23 @@ const PublishModal = ({
           <div className="flex justify-between items-center w-full">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-sm text-gray-600">Ready to publish</span>
+                <div
+                  className={cn(
+                    'w-2 h-2 rounded-full',
+                    !title.trim()
+                      ? 'bg-red-400'
+                      : !selectedTopic && !isEditMode
+                      ? 'bg-yellow-400'
+                      : 'bg-green-400'
+                  )}
+                ></div>
+                <span className="text-sm text-gray-600">
+                  {!title.trim()
+                    ? 'Title required'
+                    : !selectedTopic && !isEditMode
+                    ? 'Category recommended'
+                    : 'Ready to publish'}
+                </span>
               </div>
             </div>
 
@@ -280,7 +367,11 @@ const PublishModal = ({
               </Button>
               <Button
                 onClick={handlePublishClick}
-                disabled={isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  !title.trim() ||
+                  (isScheduling && publishDate && publishDate <= new Date())
+                }
                 className={cn(
                   'px-8 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200',
                   isScheduling
