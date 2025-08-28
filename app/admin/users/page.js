@@ -17,6 +17,7 @@ import {
   FunnelIcon,
   GlobeAltIcon,
   MagnifyingGlassIcon,
+  PencilIcon,
   PhoneIcon,
   TrashIcon,
   UserGroupIcon,
@@ -47,25 +48,108 @@ const UsersPage = () => {
 
   // Modal states
   const [showUserDetails, setShowUserDetails] = useState(false);
+  const [showRoleUpdate, setShowRoleUpdate] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [newRole, setNewRole] = useState('');
 
   // Action states
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [deletingUserId, setDeletingUserId] = useState(null);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
 
-  // Redirect if not authenticated or not admin
+  // Role hierarchy helper
+  const getRoleHierarchy = (role) => {
+    const hierarchy = {
+      SUPERADMIN: 4,
+      ADMIN: 3,
+      MODERATOR: 2,
+      USER: 1,
+    };
+    return hierarchy[role] || 0;
+  };
+
+  // Check if current user can modify target user
+  const canModifyUser = (targetUserRole, targetUserId) => {
+    if (!user) return false;
+
+    const currentLevel = getRoleHierarchy(user.role);
+    const targetLevel = getRoleHierarchy(targetUserRole);
+
+    // SUPERADMIN can modify anyone except themselves for delete/deactivate
+    if (user.role === 'SUPERADMIN') {
+      return true;
+    }
+
+    // ADMIN can only modify USER and MODERATOR
+    if (user.role === 'ADMIN') {
+      return targetUserRole === 'USER' || targetUserRole === 'MODERATOR';
+    }
+
+    return false;
+  };
+
+  // Check if action is restricted for current user
+  const isActionRestricted = (targetUserRole, targetUserId, action) => {
+    if (!user) return true;
+
+    // SUPERADMIN cannot delete/deactivate themselves
+    if (
+      user.role === 'SUPERADMIN' &&
+      user.id === targetUserId &&
+      (action === 'delete' || action === 'deactivate')
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Helper function to check if user is protected
+  const isProtectedUser = (userToCheck) => {
+    if (!user) return true;
+
+    // Can't modify if no permission
+    if (!canModifyUser(userToCheck.role, userToCheck.id)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Get role badge color
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'SUPERADMIN':
+        return 'bg-red-100 text-red-800';
+      case 'ADMIN':
+        return 'bg-purple-100 text-purple-800';
+      case 'MODERATOR':
+        return 'bg-blue-100 text-blue-800';
+      case 'USER':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Redirect if not authenticated or not admin/superadmin
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/sign-in');
     }
-    if (!loading && isAuthenticated && user?.role !== 'ADMIN') {
+    if (
+      !loading &&
+      isAuthenticated &&
+      !['ADMIN', 'SUPERADMIN'].includes(user?.role)
+    ) {
       router.push('/dashboard');
     }
   }, [loading, isAuthenticated, user, router]);
 
   // Fetch all users
   const fetchUsers = useCallback(async () => {
-    if (!isAuthenticated || user?.role !== 'ADMIN') return;
+    if (!isAuthenticated || !['ADMIN', 'SUPERADMIN'].includes(user?.role))
+      return;
 
     setUsersLoading(true);
     try {
@@ -89,7 +173,9 @@ const UsersPage = () => {
   }, [isAuthenticated, user, authenticatedFetch]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'ADMIN') fetchUsers();
+    if (isAuthenticated && ['ADMIN', 'SUPERADMIN'].includes(user?.role)) {
+      fetchUsers();
+    }
   }, [isAuthenticated, user, fetchUsers]);
 
   // Search and Filter Logic
@@ -143,9 +229,14 @@ const UsersPage = () => {
     });
   };
 
-  // Toggle User Status (Active/Inactive) - ADMIN PROTECTION ADDED
+  // Toggle User Status with role hierarchy
   const handleToggleUserStatus = async (userId) => {
-    console.log('Toggling user status for:', userId);
+    const targetUser = users.find((u) => u.id === userId);
+
+    if (isActionRestricted(targetUser.role, userId, 'deactivate')) {
+      showMessage('SUPERADMIN cannot deactivate themselves', 'error');
+      return;
+    }
 
     setUpdatingUserId(userId);
     try {
@@ -156,15 +247,12 @@ const UsersPage = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          // No body needed since we're just toggling
         }
       );
 
       const data = await response.json();
-      console.log('Toggle response:', data);
 
       if (response.ok && data.success) {
-        // Update the user in local state
         setUsers((prevUsers) =>
           prevUsers.map((u) =>
             u.id === userId ? { ...u, isActive: data.data.isActive } : u
@@ -182,8 +270,15 @@ const UsersPage = () => {
     }
   };
 
-  // Delete User - ADMIN PROTECTION ADDED
+  // Delete User with role hierarchy
   const handleDeleteUser = async (userId) => {
+    const targetUser = users.find((u) => u.id === userId);
+
+    if (isActionRestricted(targetUser.role, userId, 'delete')) {
+      showMessage('SUPERADMIN cannot delete themselves', 'error');
+      return;
+    }
+
     if (
       !confirm(
         'Are you sure you want to delete this user? This action cannot be undone.'
@@ -217,15 +312,74 @@ const UsersPage = () => {
     }
   };
 
+  // Update User Role (SUPERADMIN only)
+  const handleUpdateRole = (user) => {
+    if (!canUpdateRole(user)) {
+      showMessage(
+        "You do not have permission to update this user's role",
+        'error'
+      );
+      return;
+    }
+
+    setSelectedUser(user);
+    setNewRole(user.role);
+    setShowRoleUpdate(true);
+  };
+
+  const canUpdateRole = (targetUser) => {
+    // Only SUPERADMIN can update roles
+    return user?.role === 'SUPERADMIN';
+  };
+
+  const submitRoleUpdate = async () => {
+    if (!selectedUser || !newRole) return;
+
+    // Prevent SUPERADMIN from demoting themselves
+    if (user.id === selectedUser.id && newRole !== 'SUPERADMIN') {
+      showMessage('SUPERADMIN cannot demote themselves', 'error');
+      return;
+    }
+
+    setUpdatingRoleUserId(selectedUser.id);
+    try {
+      const response = await authenticatedFetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/${selectedUser.id}/role`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUsers((prevUsers) =>
+          prevUsers.map((u) =>
+            u.id === selectedUser.id ? { ...u, role: data.data.role } : u
+          )
+        );
+        showMessage(data.message, 'success');
+        setShowRoleUpdate(false);
+        setSelectedUser(null);
+      } else {
+        showMessage(data.message || 'Failed to update user role', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to update user role:', error);
+      showMessage('Failed to update user role', 'error');
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  };
+
   // View User Details
   const handleViewUser = (user) => {
     setSelectedUser(user);
     setShowUserDetails(true);
-  };
-
-  // Helper function to check if user is admin
-  const isAdminUser = (userToCheck) => {
-    return userToCheck.role === 'ADMIN';
   };
 
   if (loading || usersLoading) {
@@ -241,7 +395,8 @@ const UsersPage = () => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'ADMIN') return null;
+  if (!isAuthenticated || !['ADMIN', 'SUPERADMIN'].includes(user?.role))
+    return null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -255,6 +410,11 @@ const UsersPage = () => {
               </h1>
               <p className="text-gray-600 mt-2">
                 Manage all registered users and their permissions
+                {user?.role === 'SUPERADMIN' && (
+                  <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                    SUPERADMIN ACCESS
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -280,10 +440,22 @@ const UsersPage = () => {
               <span className="text-gray-500 ml-1">Inactive</span>
             </div>
             <div className="text-sm">
-              <span className="font-medium text-blue-600">
+              <span className="font-medium text-red-600">
+                {users.filter((u) => u.role === 'SUPERADMIN').length}
+              </span>
+              <span className="text-gray-500 ml-1">Super Admins</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium text-purple-600">
                 {users.filter((u) => u.role === 'ADMIN').length}
               </span>
               <span className="text-gray-500 ml-1">Admins</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium text-blue-600">
+                {users.filter((u) => u.role === 'MODERATOR').length}
+              </span>
+              <span className="text-gray-500 ml-1">Moderators</span>
             </div>
             <div className="text-sm">
               <span className="font-medium text-gray-600">
@@ -357,6 +529,7 @@ const UsersPage = () => {
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Roles</option>
+                <option value="SUPERADMIN">Super Admin</option>
                 <option value="ADMIN">Admin</option>
                 <option value="MODERATOR">Moderator</option>
                 <option value="USER">User</option>
@@ -403,8 +576,8 @@ const UsersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
+                  {filteredUsers.map((targetUser) => (
+                    <tr key={targetUser.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
@@ -412,14 +585,19 @@ const UsersPage = () => {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {user.firstName} {user.lastName}
+                              {targetUser.firstName} {targetUser.lastName}
+                              {user?.id === targetUser.id && (
+                                <span className="ml-2 text-xs text-blue-600 font-semibold">
+                                  (You)
+                                </span>
+                              )}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {user.email}
+                              {targetUser.email}
                             </div>
-                            {user.username && (
+                            {targetUser.username && (
                               <div className="text-xs text-gray-400">
-                                @{user.username}
+                                @{targetUser.username}
                               </div>
                             )}
                           </div>
@@ -427,24 +605,22 @@ const UsersPage = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.role === 'ADMIN'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(
+                            targetUser.role
+                          )}`}
                         >
-                          {user.role}
+                          {targetUser.role}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-                            user.isActive
+                            targetUser.isActive
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {user.isActive ? (
+                          {targetUser.isActive ? (
                             <>
                               <CheckCircleIcon className="w-3 h-3 mr-1" />
                               Active
@@ -460,80 +636,154 @@ const UsersPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex items-center">
                           <CalendarIcon className="w-4 h-4 mr-1" />
-                          {formatDate(user.createdAt)}
+                          {formatDate(targetUser.createdAt)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
-                          onClick={() => handleViewUser(user)}
+                          onClick={() => handleViewUser(targetUser)}
                           className="inline-flex items-center px-3 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
                         >
                           <EyeIcon className="w-4 h-4 mr-1" />
                           View
                         </button>
 
-                        {/* Admin Protection: Disable status toggle for ADMIN users */}
+                        {/* Role Update Button (SUPERADMIN only) */}
+                        {canUpdateRole(targetUser) && (
+                          <button
+                            onClick={() => handleUpdateRole(targetUser)}
+                            disabled={updatingRoleUserId === targetUser.id}
+                            className="inline-flex items-center px-3 py-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-md transition-colors"
+                          >
+                            {updatingRoleUserId === targetUser.id ? (
+                              <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-1"></div>
+                            ) : (
+                              <PencilIcon className="w-4 h-4 mr-1" />
+                            )}
+                            Role
+                          </button>
+                        )}
+
+                        {/* Status Toggle Button */}
                         <button
-                          onClick={() => handleToggleUserStatus(user.id)}
+                          onClick={() => handleToggleUserStatus(targetUser.id)}
                           disabled={
-                            updatingUserId === user.id || isAdminUser(user)
+                            updatingUserId === targetUser.id ||
+                            isProtectedUser(targetUser) ||
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'deactivate'
+                            )
                           }
                           className={`inline-flex items-center px-3 py-1 rounded-md transition-colors ${
-                            isAdminUser(user)
+                            isProtectedUser(targetUser) ||
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'deactivate'
+                            )
                               ? 'text-gray-400 cursor-not-allowed bg-gray-100'
-                              : user.isActive
+                              : targetUser.isActive
                               ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
                               : 'text-green-600 hover:text-green-800 hover:bg-green-50'
                           } ${
-                            (updatingUserId === user.id || isAdminUser(user)) &&
+                            (updatingUserId === targetUser.id ||
+                              isProtectedUser(targetUser) ||
+                              isActionRestricted(
+                                targetUser.role,
+                                targetUser.id,
+                                'deactivate'
+                              )) &&
                             'opacity-50'
                           }`}
                           title={
-                            isAdminUser(user)
-                              ? 'Admin users cannot be deactivated'
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'deactivate'
+                            )
+                              ? 'You cannot deactivate yourself'
+                              : isProtectedUser(targetUser)
+                              ? 'You do not have permission to modify this user'
                               : ''
                           }
                         >
-                          {updatingUserId === user.id ? (
+                          {updatingUserId === targetUser.id ? (
                             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></div>
-                          ) : user.isActive ? (
+                          ) : targetUser.isActive ? (
                             <XCircleIcon className="w-4 h-4 mr-1" />
                           ) : (
                             <CheckCircleIcon className="w-4 h-4 mr-1" />
                           )}
-                          {isAdminUser(user)
+                          {isProtectedUser(targetUser) ||
+                          isActionRestricted(
+                            targetUser.role,
+                            targetUser.id,
+                            'deactivate'
+                          )
                             ? 'Protected'
-                            : user.isActive
+                            : targetUser.isActive
                             ? 'Deactivate'
                             : 'Activate'}
                         </button>
 
-                        {/* Admin Protection: Disable delete for ADMIN users */}
+                        {/* Delete Button */}
                         <button
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => handleDeleteUser(targetUser.id)}
                           disabled={
-                            deletingUserId === user.id || isAdminUser(user)
+                            deletingUserId === targetUser.id ||
+                            isProtectedUser(targetUser) ||
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'delete'
+                            )
                           }
                           className={`inline-flex items-center px-3 py-1 rounded-md transition-colors ${
-                            isAdminUser(user)
+                            isProtectedUser(targetUser) ||
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'delete'
+                            )
                               ? 'text-gray-400 cursor-not-allowed bg-gray-100'
                               : 'text-red-600 hover:text-red-800 hover:bg-red-50'
                           } ${
-                            (deletingUserId === user.id || isAdminUser(user)) &&
+                            (deletingUserId === targetUser.id ||
+                              isProtectedUser(targetUser) ||
+                              isActionRestricted(
+                                targetUser.role,
+                                targetUser.id,
+                                'delete'
+                              )) &&
                             'opacity-50'
                           }`}
                           title={
-                            isAdminUser(user)
-                              ? 'Admin users cannot be deleted'
+                            isActionRestricted(
+                              targetUser.role,
+                              targetUser.id,
+                              'delete'
+                            )
+                              ? 'You cannot delete yourself'
+                              : isProtectedUser(targetUser)
+                              ? 'You do not have permission to modify this user'
                               : ''
                           }
                         >
-                          {deletingUserId === user.id ? (
+                          {deletingUserId === targetUser.id ? (
                             <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-1"></div>
                           ) : (
                             <TrashIcon className="w-4 h-4 mr-1" />
                           )}
-                          {isAdminUser(user) ? 'Protected' : 'Delete'}
+                          {isProtectedUser(targetUser) ||
+                          isActionRestricted(
+                            targetUser.role,
+                            targetUser.id,
+                            'delete'
+                          )
+                            ? 'Protected'
+                            : 'Delete'}
                         </button>
                       </td>
                     </tr>
@@ -572,6 +822,11 @@ const UsersPage = () => {
                 <div>
                   <h4 className="text-xl font-semibold text-gray-900">
                     {selectedUser.firstName} {selectedUser.lastName}
+                    {user?.id === selectedUser.id && (
+                      <span className="ml-2 text-sm text-blue-600 font-semibold">
+                        (You)
+                      </span>
+                    )}
                   </h4>
                   <p className="text-gray-600">@{selectedUser.username}</p>
                   <div className="flex items-center gap-2 mt-2">
@@ -597,10 +852,10 @@ const UsersPage = () => {
                         </>
                       )}
                     </Badge>
-                    {isAdminUser(selectedUser) && (
+                    {isProtectedUser(selectedUser) && (
                       <Badge
                         variant="secondary"
-                        className="bg-purple-100 text-purple-800 hover:bg-purple-100"
+                        className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
                       >
                         Protected Account
                       </Badge>
@@ -653,14 +908,8 @@ const UsersPage = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-500">Role</p>
                     <Badge
-                      variant={
-                        selectedUser.role === 'ADMIN' ? 'default' : 'secondary'
-                      }
-                      className={
-                        selectedUser.role === 'ADMIN'
-                          ? 'bg-purple-100 text-purple-800 hover:bg-purple-100'
-                          : 'bg-gray-100 text-gray-800 hover:bg-gray-100'
-                      }
+                      variant="secondary"
+                      className={getRoleBadgeColor(selectedUser.role)}
                     >
                       {selectedUser.role}
                     </Badge>
@@ -701,6 +950,75 @@ const UsersPage = () => {
                     {formatDate(selectedUser.updatedAt)}
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Update Modal */}
+      <Dialog open={showRoleUpdate} onOpenChange={setShowRoleUpdate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update User Role</DialogTitle>
+            <DialogDescription>
+              Change the role for {selectedUser?.firstName}{' '}
+              {selectedUser?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedUser && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Role
+                </label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={updatingRoleUserId === selectedUser.id}
+                >
+                  <option value="USER">User</option>
+                  <option value="MODERATOR">Moderator</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="SUPERADMIN">Super Admin</option>
+                </select>
+              </div>
+
+              {user?.id === selectedUser.id && newRole !== 'SUPERADMIN' && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    ⚠️ You cannot demote yourself from SUPERADMIN role.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => setShowRoleUpdate(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  disabled={updatingRoleUserId === selectedUser.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitRoleUpdate}
+                  disabled={
+                    updatingRoleUserId === selectedUser.id ||
+                    (user?.id === selectedUser.id && newRole !== 'SUPERADMIN')
+                  }
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {updatingRoleUserId === selectedUser.id ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Role'
+                  )}
+                </button>
               </div>
             </div>
           )}
