@@ -44,10 +44,7 @@ const DashboardLayout = ({ children }) => {
                   />
                 </svg>
               </button>
-              <Link
-                href="/dashboard"
-                className="text-xl font-bold text-gray-800"
-              >
+              <Link href="/" className="text-xl font-bold text-gray-800">
                 BlogDash
               </Link>
             </div>

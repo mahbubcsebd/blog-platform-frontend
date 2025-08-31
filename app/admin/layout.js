@@ -14,7 +14,7 @@ const AdminLayout = ({ children }) => {
   const menuItems = [
     { href: '/admin', label: 'Dashboard', icon: '📊', badge: null },
     { href: '/admin/posts', label: 'All Posts', icon: '📚', badge: '145' },
-    { href: '/admin/categories', label: 'Categories', icon: '🏷️', badge: null },
+    { href: '/admin/topics', label: 'Topics', icon: '🏷️', badge: null },
     { href: '/admin/users', label: 'Users', icon: '👥', badge: '12' },
     {
       href: '/admin/settings',

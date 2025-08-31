@@ -2,7 +2,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
-import { AlertTriangle, Shield } from 'lucide-react';
+import { AlertTriangle, Crown, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -12,16 +12,22 @@ const AdminRouteGuard = ({ children }) => {
 
   console.log(user);
 
-  const isAdminOrModerator =
-    user?.role === 'ADMIN' || user?.role === 'MODERATOR';
+  // Updated to include SUPERADMIN
+  const isAuthorized =
+    user?.role === 'SUPERADMIN' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'MODERATOR';
+
+  // Check if user is SUPERADMIN for special styling
+  const isSuperAdmin = user?.role === 'SUPERADMIN';
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/sign-in');
-    } else if (!loading && isAuthenticated && !isAdminOrModerator) {
+    } else if (!loading && isAuthenticated && !isAuthorized) {
       router.push('/dashboard');
     }
-  }, [loading, isAuthenticated, isAdminOrModerator, router]);
+  }, [loading, isAuthenticated, isAuthorized, router]);
 
   // Loading state
   if (loading) {
@@ -40,8 +46,8 @@ const AdminRouteGuard = ({ children }) => {
     return null; // Will redirect to sign-in
   }
 
-  // Authenticated but not admin/moderator
-  if (!isAdminOrModerator) {
+  // Authenticated but not authorized
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
@@ -51,8 +57,9 @@ const AdminRouteGuard = ({ children }) => {
               Access Denied
             </h1>
             <p className="text-gray-600 mb-6">
-              You don't have permission to access this admin area. Only
-              administrators and moderators can access this section.
+              You don't have permission to access this admin area. Only super
+              administrators, administrators and moderators can access this
+              section.
             </p>
             <div className="space-y-2">
               <button
@@ -74,24 +81,53 @@ const AdminRouteGuard = ({ children }) => {
     );
   }
 
-  // Authorized admin/moderator
+  // Get appropriate colors and styling based on role
+  const getHeaderStyling = () => {
+    if (isSuperAdmin) {
+      return {
+        gradient: 'bg-gradient-to-r from-yellow-500 to-orange-600',
+        buttonBg: 'bg-yellow-600 hover:bg-yellow-700',
+        textColor: 'text-yellow-100',
+      };
+    }
+    return {
+      gradient: 'bg-gradient-to-r from-purple-600 to-purple-700',
+      buttonBg: 'bg-purple-800 hover:bg-purple-900',
+      textColor: 'text-purple-200',
+    };
+  };
+
+  const styling = getHeaderStyling();
+
+  // Authorized user
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">
+      <div className={`${styling.gradient} text-white p-4`}>
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Shield className="h-6 w-6" />
+            {isSuperAdmin ? (
+              <Crown className="h-6 w-6 text-yellow-300" />
+            ) : (
+              <Shield className="h-6 w-6" />
+            )}
             <div>
-              <h1 className="text-lg font-semibold">Admin Panel</h1>
-              <p className="text-sm text-purple-200">
+              <h1 className="text-lg font-semibold">
+                {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
+              </h1>
+              <p className={`text-sm ${styling.textColor}`}>
                 Logged in as {user.firstName} ({user.role})
+                {isSuperAdmin && (
+                  <span className="ml-2 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-semibold rounded-full">
+                    SUPER
+                  </span>
+                )}
               </p>
             </div>
           </div>
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 bg-purple-800 hover:bg-purple-900 rounded-lg transition-colors text-sm"
+            className={`px-4 py-2 ${styling.buttonBg} rounded-lg transition-colors text-sm`}
           >
             Back to Dashboard
           </button>

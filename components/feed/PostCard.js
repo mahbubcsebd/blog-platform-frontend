@@ -54,10 +54,7 @@ export default function PostCard({ post, priority = false }) {
   const displayDate = publishDate || createdAt;
 
   return (
-    <Link
-      href={postUrl}
-      className="bg-white border-b border-gray-100 transition-all duration-200 py-6 pt-4 rounded-md"
-    >
+    <div className="bg-white border-b border-gray-100 transition-all duration-200 py-6 pt-4 rounded-md">
       <div className="px-6">
         <div className="flex gap-6">
           {/* Content Section */}
@@ -213,6 +210,6 @@ export default function PostCard({ post, priority = false }) {
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
