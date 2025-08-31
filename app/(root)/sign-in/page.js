@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
 function SignInForm() {
   const router = useRouter();
@@ -33,21 +33,79 @@ function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, user, loading: authLoading } = useAuth();
+
+  // Prevent multiple redirects
+  const [hasRedirected, setHasRedirected] = useState(false);
+  const redirectTimeoutRef = useRef(null);
 
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
   const wasRedirected = searchParams.has('redirect');
 
+  // ------------------------------
+  // FIXED: Prevent infinite redirect loops
+  // ------------------------------
   useEffect(() => {
-    if (isAuthenticated && user) {
-      if (user.role === 'ADMIN') {
-        router.replace('/admin');
-      } else {
-        router.replace(redirectUrl); // immediate redirect
-      }
+    // Don't redirect while auth is still loading
+    if (authLoading) {
+      console.log('🔄 Auth still loading, waiting...');
+      return;
     }
-  }, [isAuthenticated, user, router, redirectUrl]);
 
+    // Don't redirect if we already have
+    if (hasRedirected) {
+      console.log('⚠️ Already redirected, skipping...');
+      return;
+    }
+
+    // Only redirect if actually authenticated
+    if (isAuthenticated && user) {
+      console.log('✅ User authenticated, preparing redirect...', {
+        userRole: user.role,
+        redirectUrl,
+      });
+
+      setHasRedirected(true);
+
+      // Clear any existing timeout
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+
+      // Delay redirect slightly to prevent race conditions
+      redirectTimeoutRef.current = setTimeout(() => {
+        console.log('🔀 Redirecting authenticated user...');
+
+        // Determine redirect based on user role
+        if (
+          user.role === 'ADMIN' ||
+          user.role === 'MODERATOR' ||
+          user.role === 'SUPERADMIN'
+        ) {
+          const targetUrl =
+            redirectUrl === '/dashboard' ? '/admin' : redirectUrl;
+          console.log('🛡️ Admin user redirecting to:', targetUrl);
+          router.replace(targetUrl);
+        } else {
+          console.log('👤 Regular user redirecting to:', redirectUrl);
+          router.replace(redirectUrl);
+        }
+      }, 500); // Small delay to ensure state is stable
+    } else if (!authLoading) {
+      console.log('ℹ️ User not authenticated, staying on sign-in page');
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, [isAuthenticated, user, authLoading, hasRedirected, redirectUrl, router]);
+
+  // ------------------------------
+  // Enhanced form submission
+  // ------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -56,7 +114,7 @@ function SignInForm() {
 
     try {
       const formData = new FormData(e.target);
-      const username = formData.get('username');
+      const username = formData.get('username')?.trim();
       const password = formData.get('password');
 
       if (!username || !password) {
@@ -64,29 +122,58 @@ function SignInForm() {
         return;
       }
 
+      console.log('🔐 Attempting login for:', username);
       const result = await login(username, password);
 
-      console.log(result);
+      console.log('🔐 Login result:', result);
 
       if (result.success) {
         setSuccess(true);
+        console.log('✅ Login successful, user role:', result.user?.role);
+
+        // Don't manually redirect here - let the useEffect handle it
+        // This prevents race conditions
       } else {
-        setError(result.error);
+        setError(result.error || 'Login failed');
+        console.log('❌ Login failed:', result.error);
       }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (isAuthenticated) {
+  // Show loading if auth is still initializing
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Redirecting to dashboard...</p>
+          <p className="text-gray-600">Checking authentication...</p>
+          {process.env.NODE_ENV === 'development' && (
+            <p className="text-sm text-gray-400 mt-2">
+              Auth Loading: {authLoading ? 'true' : 'false'} | Authenticated:{' '}
+              {isAuthenticated ? 'true' : 'false'} | User:{' '}
+              {user?.username || 'none'}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show redirect screen if already authenticated
+  if (isAuthenticated && user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <CheckCircle2 className="h-8 w-8 mx-auto mb-4 text-green-600" />
+          <p className="text-gray-600">Already signed in. Redirecting...</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Welcome back, {user.firstName || user.username}!
+          </p>
         </div>
       </div>
     );
@@ -202,12 +289,17 @@ function SignInForm() {
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                disabled={loading}
+                disabled={loading || success}
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing In...
+                  </>
+                ) : success ? (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Redirecting...
                   </>
                 ) : (
                   'Sign In'
@@ -219,7 +311,9 @@ function SignInForm() {
                   Don't have an account?{' '}
                   <Link
                     href={`/sign-up${
-                      wasRedirected ? `?redirect=${redirectUrl}` : ''
+                      wasRedirected
+                        ? `?redirect=${encodeURIComponent(redirectUrl)}`
+                        : ''
                     }`}
                     className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                   >
@@ -229,6 +323,23 @@ function SignInForm() {
               </div>
             </CardFooter>
           </form>
+
+          {/* Debug Panel - Development Only */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="border-t bg-gray-50 p-3 text-xs text-gray-600">
+              <div className="space-y-1">
+                <div>
+                  <strong>Debug Info:</strong>
+                </div>
+                <div>Auth Loading: {authLoading ? 'Yes' : 'No'}</div>
+                <div>Authenticated: {isAuthenticated ? 'Yes' : 'No'}</div>
+                <div>User Role: {user?.role || 'None'}</div>
+                <div>Has Redirected: {hasRedirected ? 'Yes' : 'No'}</div>
+                <div>Redirect URL: {redirectUrl}</div>
+                <div>Was Redirected: {wasRedirected ? 'Yes' : 'No'}</div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>
@@ -241,7 +352,7 @@ function SignInPageFallback() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
       <div className="text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-        <p className="text-gray-600">Loading...</p>
+        <p className="text-gray-600">Loading sign in page...</p>
       </div>
     </div>
   );

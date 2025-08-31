@@ -1,4 +1,4 @@
-// hooks/useAuth.js - PROPERLY OPTIMIZED VERSION
+// hooks/useAuth.js - FIXED INFINITE LOOP VERSION
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -17,65 +18,142 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tokenExpiry, setTokenExpiry] = useState(null); // Track token expiry
+  const [tokenExpiry, setTokenExpiry] = useState(null);
+
+  // Add initialization tracking to prevent loops
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const initializationRef = useRef(false);
+
+  // ------------------------------
+  // Enhanced localStorage for token persistence
+  // ------------------------------
+  const saveToStorage = useCallback((key, value) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+        console.warn('Failed to save to localStorage:', error);
+      }
+    }
+  }, []);
+
+  const getFromStorage = useCallback((key) => {
+    if (typeof window !== 'undefined') {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+      } catch (error) {
+        console.warn('Failed to read from localStorage:', error);
+        return null;
+      }
+    }
+    return null;
+  }, []);
+
+  const removeFromStorage = useCallback((key) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn('Failed to remove from localStorage:', error);
+      }
+    }
+  }, []);
 
   // ------------------------------
   // Set/Clear Auth Data
   // ------------------------------
-  const setAuthData = useCallback(({ token, userData, expiresIn }) => {
-    setAccessToken(token);
-    setUser(userData);
+  const setAuthData = useCallback(
+    ({ token, userData, expiresIn }) => {
+      console.log('🔧 Setting auth data:', {
+        userData: userData?.username,
+        token: !!token,
+      });
 
-    console.log('this is set user', userData);
+      setAccessToken(token);
+      setUser(userData);
 
-    // Calculate expiry time (subtract 1 minute for safety margin)
-    if (expiresIn || token) {
-      const expiryTime =
-        Date.now() + (expiresIn ? expiresIn * 1000 - 60000 : 14 * 60 * 1000);
-      setTokenExpiry(expiryTime);
-    }
-  }, []);
+      // Calculate expiry time (subtract 1 minute for safety margin)
+      if (expiresIn || token) {
+        const expiryTime =
+          Date.now() + (expiresIn ? expiresIn * 1000 - 60000 : 14 * 60 * 1000);
+        setTokenExpiry(expiryTime);
+
+        // Save to localStorage for persistence
+        saveToStorage('auth_token', token);
+        saveToStorage('auth_user', userData);
+        saveToStorage('auth_expiry', expiryTime);
+      }
+    },
+    [saveToStorage]
+  );
 
   const clearAuthData = useCallback(() => {
+    console.log('🧹 Clearing auth data');
     setAccessToken(null);
     setUser(null);
     setTokenExpiry(null);
-  }, []);
+
+    // Clear localStorage
+    removeFromStorage('auth_token');
+    removeFromStorage('auth_user');
+    removeFromStorage('auth_expiry');
+  }, [removeFromStorage]);
 
   // ------------------------------
-  // Check if token is expired
+  // Check if token is expired - memoized to prevent recalculations
   // ------------------------------
   const isTokenExpired = useCallback(() => {
     if (!tokenExpiry) return true;
-    return Date.now() >= tokenExpiry;
+    const expired = Date.now() >= tokenExpiry;
+    return expired;
   }, [tokenExpiry]);
 
   // ------------------------------
-  // Refresh Token (only when needed)
+  // Enhanced Refresh Token with better error handling
   // ------------------------------
   const refreshAccessToken = useCallback(async () => {
     try {
       console.log('🔄 Refreshing access token...');
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/refresh`,
         {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
         }
       );
 
-      const data = await res.json();
+      console.log('🔄 Refresh response status:', res.status);
 
-      if (res.ok && data.success) {
+      // If 401, session actually expired - don't treat as error
+      if (res.status === 401) {
+        console.log('🔒 Session expired (401) - clearing auth data');
+        clearAuthData();
+        return null;
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log('❌ Refresh failed - Response:', errorText);
+        clearAuthData();
+        return null;
+      }
+
+      const data = await res.json();
+      console.log('✅ Refresh successful');
+
+      if (data.success) {
         const { accessToken: newToken, user: userData, expiresIn } = data.data;
-        console.log(userData, data.data);
         setAuthData({
           token: newToken,
           userData,
-          expiresIn: expiresIn || 15 * 60, // Default 15 minutes if not provided
+          expiresIn: expiresIn || 15 * 60,
         });
-        console.log('✅ Token refreshed successfully');
         return newToken;
       } else {
         console.log('❌ Token refresh failed:', data.message);
@@ -90,7 +168,7 @@ export const AuthProvider = ({ children }) => {
   }, [setAuthData, clearAuthData]);
 
   // ------------------------------
-  // Get Valid Token (smart token management)
+  // Get Valid Token
   // ------------------------------
   const getValidToken = useCallback(async () => {
     // If no token at all, try to refresh from httpOnly cookie
@@ -106,25 +184,31 @@ export const AuthProvider = ({ children }) => {
     }
 
     // Token is valid, use it
-    console.log('✅ Using existing valid token');
     return accessToken;
   }, [accessToken, isTokenExpired, refreshAccessToken]);
 
   // ------------------------------
-  // Login / Register
+  // Enhanced Login with better debugging
   // ------------------------------
   const login = useCallback(
     async (username, password) => {
       try {
+        console.log('🔐 Login attempt for:', username);
+
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
             body: JSON.stringify({ username, password }),
             credentials: 'include',
           }
         );
+
+        console.log('🔐 Login response status:', res.status);
         const data = await res.json();
 
         if (res.ok && data.success) {
@@ -134,9 +218,14 @@ export const AuthProvider = ({ children }) => {
             userData: user,
             expiresIn: expiresIn || 15 * 60,
           });
+          console.log('✅ Login successful, user role:', user.role);
           return { success: true, user };
-        } else return { success: false, error: data.message };
+        } else {
+          console.log('❌ Login failed:', data.message);
+          return { success: false, error: data.message };
+        }
       } catch (err) {
+        console.error('❌ Login error:', err);
         return { success: false, error: 'Network error' };
       }
     },
@@ -146,11 +235,15 @@ export const AuthProvider = ({ children }) => {
   const register = useCallback(
     async (userData) => {
       try {
+        console.log('📝 Register attempt');
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/register`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
             body: JSON.stringify(userData),
             credentials: 'include',
           }
@@ -195,23 +288,89 @@ export const AuthProvider = ({ children }) => {
   }, [accessToken, clearAuthData, router]);
 
   // ------------------------------
-  // Initialize Auth on Mount (ONE TIME ONLY)
+  // FIXED: Initialize Auth - prevent infinite loops
   // ------------------------------
   useEffect(() => {
+    // Prevent multiple initialization attempts
+    if (initializationRef.current) {
+      console.log('⚠️ Auth already initializing, skipping...');
+      return;
+    }
+
     let mounted = true;
+    let timeoutId;
+    initializationRef.current = true;
 
     const initializeAuth = async () => {
       try {
-        console.log('🚀 Initializing auth...');
-        // Only try to refresh if we don't have a valid token
-        if (!accessToken || isTokenExpired()) {
+        console.log('🚀 Initializing auth (one time only)...');
+
+        // Set a timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.log(
+              '⏰ Auth initialization timeout - setting loading false'
+            );
+            setLoading(false);
+            setHasInitialized(true);
+          }
+        }, 4000);
+
+        // First, try to restore from localStorage
+        const storedToken = getFromStorage('auth_token');
+        const storedUser = getFromStorage('auth_user');
+        const storedExpiry = getFromStorage('auth_expiry');
+
+        console.log('💾 Checking stored auth data:', {
+          hasStoredToken: !!storedToken,
+          hasStoredUser: !!storedUser,
+          hasStoredExpiry: !!storedExpiry,
+        });
+
+        if (storedToken && storedUser && storedExpiry) {
+          // Check if stored token is expired
+          const now = Date.now();
+          const isStoredTokenExpired = now >= storedExpiry;
+
+          console.log('🕐 Token expiry check:', {
+            now: new Date(now).toLocaleString(),
+            expiry: new Date(storedExpiry).toLocaleString(),
+            isExpired: isStoredTokenExpired,
+          });
+
+          if (isStoredTokenExpired) {
+            console.log('⏰ Stored token expired, attempting refresh...');
+            // Clear expired data first
+            clearAuthData();
+
+            // Try to refresh
+            const newToken = await refreshAccessToken();
+            if (!newToken) {
+              console.log('❌ Could not refresh token');
+            }
+          } else {
+            // Token is still valid, restore it
+            console.log('✅ Restoring valid auth from localStorage');
+            setAccessToken(storedToken);
+            setUser(storedUser);
+            setTokenExpiry(storedExpiry);
+          }
+        } else {
+          console.log(
+            '🔍 No valid stored auth, attempting refresh from cookie...'
+          );
+          // Try to get token from httpOnly cookie
           await refreshAccessToken();
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('❌ Auth initialization error:', error);
+        clearAuthData();
       } finally {
         if (mounted) {
+          clearTimeout(timeoutId);
           setLoading(false);
+          setHasInitialized(true);
+          console.log('🏁 Auth initialization completed');
         }
       }
     };
@@ -220,11 +379,15 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      // Don't reset initializationRef here to prevent re-runs
     };
-  }, []); // Empty dependency array - only run once
+  }, []); // NO DEPENDENCIES - run only once on mount
 
   // ------------------------------
-  // Authenticated Fetch (with smart retry)
+  // Authenticated Fetch
   // ------------------------------
   const authenticatedFetch = useCallback(
     async (url, options = {}) => {
@@ -264,40 +427,45 @@ export const AuthProvider = ({ children }) => {
     [getValidToken, refreshAccessToken]
   );
 
-  // Debug info (remove in production)
+  // ------------------------------
+  // FIXED: Debug logging with proper dependencies
+  // ------------------------------
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Auth State:', {
+    if (hasInitialized) {
+      console.log('🔍 Auth State Final:', {
         hasToken: !!accessToken,
         hasUser: !!user,
+        userRole: user?.role,
         tokenExpiry: tokenExpiry
           ? new Date(tokenExpiry).toLocaleString()
           : null,
-        isExpired: isTokenExpired(),
+        isExpired: tokenExpiry ? Date.now() >= tokenExpiry : true,
+        isAuthenticated:
+          !!user && !!accessToken && tokenExpiry && Date.now() < tokenExpiry,
         loading,
       });
     }
-  }, [accessToken, user, tokenExpiry, loading, isTokenExpired]);
+  }, [accessToken, user, tokenExpiry, loading, hasInitialized]);
+
+  // Calculate isAuthenticated based on current state
+  const isAuthenticated = !!user && !!accessToken && !isTokenExpired();
+
+  const contextValue = {
+    user,
+    accessToken,
+    loading,
+    isAuthenticated,
+    login,
+    register,
+    logout,
+    getValidToken,
+    authenticatedFetch,
+    isTokenExpired,
+    refreshAccessToken,
+  };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        accessToken,
-        loading,
-        isAuthenticated: !!user && !!accessToken && !isTokenExpired(),
-        login,
-        register,
-        logout,
-        getValidToken,
-        authenticatedFetch,
-        // Utility functions
-        isTokenExpired,
-        refreshAccessToken, // Expose for manual refresh if needed
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
 
